@@ -46,6 +46,11 @@
 extern "C" {
 #endif
 
+#define PCAP_THREAD_VERSION_STR     "1.0.0"
+#define PCAP_THREAD_VERSION_MAJOR   1
+#define PCAP_THREAD_VERSION_MINOR   0
+#define PCAP_THREAD_VERSION_PATCH   0
+
 #define PCAP_THREAD_DEFAULT_TIMEOUT     1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE  64
 #define PCAP_THREAD_DEFAULT_QUEUE_WAIT  { 0, 10000 }
@@ -173,6 +178,11 @@ struct pcap_thread_pcaplist {
     int                     snapshot;
 #endif
 };
+
+const char* pcap_thread_version_str(void);
+int pcap_thread_version_major(void);
+int pcap_thread_version_minor(void);
+int pcap_thread_version_patch(void);
 
 pcap_thread_t* pcap_thread_create(void);
 void pcap_thread_free(pcap_thread_t* pcap_thread);

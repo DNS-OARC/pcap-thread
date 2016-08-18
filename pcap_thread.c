@@ -42,8 +42,30 @@
 #include <errno.h>
 
 /*
+ * Version
+ */
+
+static const char* _version = PCAP_THREAD_VERSION_STR;
+const char* pcap_thread_version_str(void) {
+    return _version;
+}
+
+int pcap_thread_version_major(void) {
+    return PCAP_THREAD_VERSION_MAJOR;
+}
+
+int pcap_thread_version_minor(void) {
+    return PCAP_THREAD_VERSION_MINOR;
+}
+
+int pcap_thread_version_patch(void) {
+    return PCAP_THREAD_VERSION_PATCH;
+}
+
+/*
  * Create/Free
  */
+
 pcap_thread_t* pcap_thread_create(void) {
     pcap_thread_t* pcap_thread = calloc(1, sizeof(pcap_thread_t));
     if (pcap_thread) {
