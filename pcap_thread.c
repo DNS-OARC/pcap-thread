@@ -723,7 +723,7 @@ static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_ch
         return;
     }
 
-    memcpy(&(pcaplist->pkthdr[pcaplist->write_pos * sizeof(struct pcap_pkthdr)]), pkthdr, sizeof(struct pcap_pkthdr));
+    memcpy(&(pcaplist->pkthdr[pcaplist->write_pos]), pkthdr, sizeof(struct pcap_pkthdr));
     memcpy(&(pcaplist->pkt[pcaplist->write_pos * pcaplist->snapshot]), pkt, pkthdr->caplen);
     pcaplist->queue[pcaplist->write_pos] = 1;
     pcaplist->write_pos++;
@@ -876,7 +876,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 while (pcaplist->queue[pcaplist->read_pos]) {
                     pcap_thread->callback(
                         pcaplist->user,
-                        &(pcaplist->pkthdr[pcaplist->read_pos * sizeof(struct pcap_pkthdr)]),
+                        &(pcaplist->pkthdr[pcaplist->read_pos]),
                         &(pcaplist->pkt[pcaplist->read_pos * pcaplist->snapshot]),
                         pcap_datalink(pcaplist->pcap)
                     );
