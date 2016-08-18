@@ -22,3 +22,4 @@
 *.su
 .deps
 .libs
+.dirstamp
