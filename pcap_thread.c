@@ -152,13 +152,14 @@ int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_que
 #ifdef HAVE_PTHREAD
     switch (queue_mode) {
         case PCAP_THREAD_QUEUE_MODE_COND:
-        case PCAP_THREAD_QUEUE_MODE_WAIT
+        case PCAP_THREAD_QUEUE_MODE_WAIT:
             break;
         case PCAP_THREAD_QUEUE_MODE_YIELD:
 #ifndef HAVE_SCHED_YIELD
             return PCAP_THREAD_NOSUPPORT;
 #else
             break;
+#endif
         default:
             return PCAP_THREAD_EINVAL;
     }
