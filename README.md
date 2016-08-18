@@ -56,10 +56,11 @@ AX_PCAP_THREAD
 ### Makefile.am
 
 ```m4
-program_SOURCES = ... pcap-thread/pcap-thread.c
-dist_program_SOURCES = ... pcap-thread/pcap-thread.h
-program_CFLAGS = $(PTHREAD_CFLAGS)
-program_LDFLAGS = $(PTHREAD_LIBS)
+AM_CFLAGS += $(PTHREAD_CFLAGS)
+
+program_SOURCES += pcap-thread/pcap-thread.c
+dist_program_SOURCES += pcap-thread/pcap-thread.h
+program_LDADD += $(PTHREAD_LIBS)
 ```
 
 ## Author(s)
