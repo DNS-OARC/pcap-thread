@@ -23,7 +23,7 @@ int main(void) {
     pcap_thread_t pt = PCAP_THREAD_T_INIT;
 
     pcap_thread_set_snaplen(&pt, 65535);
-    pcap_thread_set_filter(&pt, "port 80", -1);
+    pcap_thread_set_filter(&pt, "port 80", 7);
     pcap_thread_set_callback(&pt, packet);
     pcap_thread_open(&pt, "eth0", 0);
     pcap_thread_open(&pt, "lo", 0);

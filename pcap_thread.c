@@ -390,9 +390,7 @@ int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const
         free(pcap_thread->filter);
     }
 
-    if ((pcap_thread->filter_len = filter_len) < 0) {
-        pcap_thread->filter_len = strlen(filter);
-    }
+    pcap_thread->filter_len = filter_len;
     pcap_thread->filter = strndup(filter, filter_len);
 
     return PCAP_THREAD_OK;
