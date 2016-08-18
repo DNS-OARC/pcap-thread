@@ -706,9 +706,7 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
  */
 
 #ifdef HAVE_PTHREAD
-#include <unistd.h>
-
-void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt) {
+static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt) {
     pcap_thread_pcaplist_t* pcaplist;
 
     if (!user) {
@@ -720,13 +718,13 @@ void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt
         || pkthdr->caplen > pcaplist->snapshot)
     {
         if (pcaplist->dropback) {
-            pcaplist->dropback(pcaplist->user, pkthdr, pkt);
+            pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcap_datalink(pcaplist->pcap));
         }
         return;
     }
 
-    memcpy(&(pcaplist->pkthdr[pcaplist->write_pos]), pkthdr, sizeof(struct pcap_pkthdr));
-    memcpy(&(pcaplist->pkt[pcaplist->write_pos]), pkt, pkthdr->caplen);
+    memcpy(&(pcaplist->pkthdr[pcaplist->write_pos * sizeof(struct pcap_pkthdr)]), pkthdr, sizeof(struct pcap_pkthdr));
+    memcpy(&(pcaplist->pkt[pcaplist->write_pos * pcaplist->snapshot]), pkt, pkthdr->caplen);
     pcaplist->queue[pcaplist->write_pos] = 1;
     pcaplist->write_pos++;
     if (pcaplist->write_pos == pcaplist->queue_size) {
@@ -739,7 +737,7 @@ void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt
     }
 }
 
-void* _thread(void* vp) {
+static void* _thread(void* vp) {
     pcap_thread_pcaplist_t* pcaplist;
     int ret;
 
@@ -757,6 +755,17 @@ void* _thread(void* vp) {
     return 0;
 }
 #endif
+
+static void _callback2(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt) {
+    pcap_thread_pcaplist_t* pcaplist;
+
+    if (!user) {
+        return;
+    }
+    pcaplist = (pcap_thread_pcaplist_t*)user;
+
+    pcaplist->callback(pcaplist->user, pkthdr, pkt, pcap_datalink(pcaplist->pcap));
+}
 
 int pcap_thread_run(pcap_thread_t* pcap_thread) {
     pcap_thread_pcaplist_t* pcaplist;
@@ -865,7 +874,12 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     run = 0;
                 }
                 while (pcaplist->queue[pcaplist->read_pos]) {
-                    pcap_thread->callback(pcaplist->user, &(pcaplist->pkthdr[pcaplist->read_pos]), &(pcaplist->pkt[pcaplist->read_pos]));
+                    pcap_thread->callback(
+                        pcaplist->user,
+                        &(pcaplist->pkthdr[pcaplist->read_pos * sizeof(struct pcap_pkthdr)]),
+                        &(pcaplist->pkt[pcaplist->read_pos * pcaplist->snapshot]),
+                        pcap_datalink(pcaplist->pcap)
+                    );
 
                     pcaplist->queue[pcaplist->read_pos] = 0;
                     pcaplist->read_pos++;
@@ -900,6 +914,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             if ((pcap_thread->status = pcap_setnonblock(pcaplist->pcap, 1, pcap_thread->errbuf))) {
                 return PCAP_THREAD_EPCAP;
             }
+            pcaplist->callback = pcap_thread->callback;
         }
 
         t1.tv_sec = pcap_thread->timeout / 1000;
@@ -913,7 +928,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             }
 
             for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
-                int packets = pcap_dispatch(pcaplist->pcap, -1, pcap_thread->callback, pcaplist->user);
+                int packets = pcap_dispatch(pcaplist->pcap, -1, _callback2, (u_char*)pcaplist);
 
                 if (packets == -1) {
                     pcap_thread->status = -1;

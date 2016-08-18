@@ -78,7 +78,7 @@ extern "C" {
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
-typedef pcap_handler pcap_thread_callback_t;
+typedef void (*pcap_thread_callback_t)(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const int dlt);
 #ifndef HAVE_PCAP_DIRECTION_T
 typedef int pcap_direction_t;
 #endif
@@ -152,11 +152,13 @@ struct pcap_thread {
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
     0, 0, 0, \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+    0 \
 }
 #else
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
-    0, 0, 0 \
+    0, 0, 0, \
+    0 \
 }
 #endif
 
@@ -177,6 +179,7 @@ struct pcap_thread_pcaplist {
     pcap_thread_callback_t  dropback;
     int                     snapshot;
 #endif
+    pcap_thread_callback_t  callback;
 };
 
 const char* pcap_thread_version_str(void);
