@@ -202,9 +202,13 @@ int main(int argc, char** argv) {
 " -r <file>          pcap savefile (multiple)\n"
 " -W <usec>          queue wait\n"
 " -v                 verbose\n"
+#ifdef HAVE_PCAP_SET_TSTAMP_TYPE
 " -H <type>          timestamp type: host, host_lowprec, host_hiprec, adapter\n"
 "                    or adapter_unsynced\n"
+#endif
+#ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 " -P <type>          timestamp precision: micro or nano\n"
+#endif
 " -h                 this\n"
             );
             exit(0);
