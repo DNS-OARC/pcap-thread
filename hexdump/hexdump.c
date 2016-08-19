@@ -48,7 +48,7 @@ void dropback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt,
 
 int main(int argc, char** argv) {
     pcap_thread_t pt = PCAP_THREAD_T_INIT;
-    int flags, opt, err = 0, interface = 0, verbose = 0, i;
+    int flags, opt, err = 0, ret = 0, interface = 0, verbose = 0, i;
     char* interfaces[MAX_INTERFACES];
     char is_file[MAX_INTERFACES];
     char filter[MAX_FILTER_SIZE];
@@ -60,48 +60,48 @@ int main(int argc, char** argv) {
     while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:h")) != -1) {
         switch (opt) {
         case 'T':
-            err = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
+            ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
             break;
         case 'M':
             if (!strcmp("cond", optarg))
-                err = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_COND);
+                ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_COND);
             else if (!strcmp("wait", optarg))
-                err = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_WAIT);
+                ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_WAIT);
             else if (!strcmp("yield", optarg))
-                err = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_YIELD);
+                ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_YIELD);
             else
                 err = -1;
             break;
         case 's':
-            err = pcap_thread_set_snaplen(&pt, atoi(optarg));
+            ret = pcap_thread_set_snaplen(&pt, atoi(optarg));
             break;
         case 'p':
-            err = pcap_thread_set_promiscuous(&pt, atoi(optarg) ? 1 : 0);
+            ret = pcap_thread_set_promiscuous(&pt, atoi(optarg) ? 1 : 0);
             break;
         case 'm':
-            err = pcap_thread_set_monitor(&pt, atoi(optarg) ? 1 : 0);
+            ret = pcap_thread_set_monitor(&pt, atoi(optarg) ? 1 : 0);
             break;
         case 't':
-            err = pcap_thread_set_timeout(&pt, atoi(optarg));
+            ret = pcap_thread_set_timeout(&pt, atoi(optarg));
             break;
         case 'b':
-            err = pcap_thread_set_buffer_size(&pt, atoi(optarg));
+            ret = pcap_thread_set_buffer_size(&pt, atoi(optarg));
             break;
         case 'I':
-            err = pcap_thread_set_immediate_mode(&pt, atoi(optarg) ? 1 : 0);
+            ret = pcap_thread_set_immediate_mode(&pt, atoi(optarg) ? 1 : 0);
             break;
         case 'd':
             if (!strcmp("in", optarg))
-                err = pcap_thread_set_direction(&pt, PCAP_D_IN);
+                ret = pcap_thread_set_direction(&pt, PCAP_D_IN);
             else if (!strcmp("out", optarg))
-                err = pcap_thread_set_direction(&pt, PCAP_D_OUT);
+                ret = pcap_thread_set_direction(&pt, PCAP_D_OUT);
             else if (!strcmp("inout", optarg))
-                err = pcap_thread_set_direction(&pt, PCAP_D_INOUT);
+                ret = pcap_thread_set_direction(&pt, PCAP_D_INOUT);
             else
                 err = -1;
             break;
         case 'o':
-            err = pcap_thread_set_filter_optimize(&pt, atoi(optarg) ? 1 : 0);
+            ret = pcap_thread_set_filter_optimize(&pt, atoi(optarg) ? 1 : 0);
             break;
         case 'n':
             {
@@ -117,14 +117,14 @@ int main(int argc, char** argv) {
                         + ((netmask[1] & 0xff) << 16)
                         + ((netmask[2] & 0xff) << 8)
                         + (netmask[3] & 0xff);
-                    err = pcap_thread_set_filter_netmask(&pt, n);
+                    ret = pcap_thread_set_filter_netmask(&pt, n);
                 }
                 else
                     err = -1;
             }
             break;
         case 'S':
-            err = pcap_thread_set_queue_size(&pt, atoi(optarg));
+            ret = pcap_thread_set_queue_size(&pt, atoi(optarg));
             break;
         case 'i':
             if (interface != MAX_INTERFACES)
@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
                 t.tv_sec = atoi(optarg) / 1000000;
                 t.tv_usec = atoi(optarg) % 1000000;
 
-                err = pcap_thread_set_queue_wait(&pt, t);
+                ret = pcap_thread_set_queue_wait(&pt, t);
             }
             break;
         case 'v':
@@ -156,15 +156,15 @@ int main(int argc, char** argv) {
         case 'H':
 #ifdef HAVE_PCAP_SET_TSTAMP_TYPE
             if (!strcmp("host", optarg))
-                err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_HOST);
+                ret = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_HOST);
             else if (!strcmp("host_lowprec", optarg))
-                err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_HOST_LOWPREC);
+                ret = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_HOST_LOWPREC);
             else if (!strcmp("host_hiprec", optarg))
-                err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_HOST_HIPREC);
+                ret = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_HOST_HIPREC);
             else if (!strcmp("adapter", optarg))
-                err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_ADAPTER);
+                ret = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_ADAPTER);
             else if (!strcmp("adapter_unsynced", optarg))
-                err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_ADAPTER_UNSYNCED);
+                ret = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_ADAPTER_UNSYNCED);
             else
                 err = -1;
 #else
@@ -174,9 +174,9 @@ int main(int argc, char** argv) {
         case 'P':
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
             if (!strcmp("micro", optarg))
-                err = pcap_thread_set_timestamp_precision(&pt, PCAP_TSTAMP_PRECISION_MICRO);
+                ret = pcap_thread_set_timestamp_precision(&pt, PCAP_TSTAMP_PRECISION_MICRO);
             else if (!strcmp("nano", optarg))
-                err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_PRECISION_NANO);
+                ret = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_PRECISION_NANO);
             else
                 err = -1;
 #else
@@ -225,8 +225,12 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Invalid argument(s)\n");
         exit(1);
     }
-    if (err) {
-        fprintf(stderr, "pcap_thread error [%d:%d]: %s\n", err, pcap_thread_status(&pt), pcap_thread_errbuf(&pt));
+    if (ret == PCAP_THREAD_EPCAP) {
+        fprintf(stderr, "pcap error [%d]: %s (%s)\n", pcap_thread_status(&pt), pcap_statustostr(pcap_thread_status(&pt)), pcap_thread_errbuf(&pt));
+        exit(2);
+    }
+    if (ret) {
+        fprintf(stderr, "pcap_thread error [%d]: %s\n", ret, pcap_thread_strerr(ret));
         exit(2);
     }
 
@@ -295,39 +299,47 @@ int main(int argc, char** argv) {
         printf("filter: %s\n", filter);
     }
 
-    if (filterp != filter && (err = pcap_thread_set_filter(&pt, filter, filterp - filter)))
+    if (filterp != filter && (ret = pcap_thread_set_filter(&pt, filter, filterp - filter)))
         fprintf(stderr, "filter ");
-    else if ((err = pcap_thread_set_callback(&pt, callback)))
+    else if ((ret = pcap_thread_set_callback(&pt, callback)))
         fprintf(stderr, "set callback ");
-    else if ((err = pcap_thread_set_dropback(&pt, dropback)))
+    else if ((ret = pcap_thread_set_dropback(&pt, dropback)))
         fprintf(stderr, "set dropback ");
     else {
         for(i = 0; i < interface; i++) {
             if (is_file[i]) {
                 if (verbose) printf("file: %s\n", interfaces[i]);
-                if ((err = pcap_thread_open_offline(&pt, interfaces[i], verbose ? (u_char*)1 : 0)))
+                if ((ret = pcap_thread_open_offline(&pt, interfaces[i], verbose ? (u_char*)1 : 0))) {
+                    fprintf(stderr, "file:%s ", interfaces[i]);
                     break;
+                }
             }
             else {
                 if (verbose) printf("interface: %s\n", interfaces[i]);
-                if ((err = pcap_thread_open(&pt, interfaces[i], verbose ? (u_char*)1 : 0)))
+                if ((ret = pcap_thread_open(&pt, interfaces[i], verbose ? (u_char*)1 : 0))) {
+                    fprintf(stderr, "interface:%s ", interfaces[i]);
                     break;
+                }
             }
         }
         if (verbose) {
             printf("snapshot: %d\n", pcap_thread_snapshot(&pt));
         }
 
-        if (err)
-            fprintf(stderr, "interface ");
-        else if ((err = pcap_thread_run(&pt)))
+        if (ret)
+            fprintf(stderr, "open ");
+        else if ((ret = pcap_thread_run(&pt)))
             fprintf(stderr, "run ");
-        else if ((err = pcap_thread_close(&pt)))
+        else if ((ret = pcap_thread_close(&pt)))
             fprintf(stderr, "close ");
     }
 
-    if (err) {
-        fprintf(stderr, "pcap_thread error [%d:%d]: %s\n", err, pcap_thread_status(&pt), pcap_thread_errbuf(&pt));
+    if (ret == PCAP_THREAD_EPCAP) {
+        fprintf(stderr, "pcap error [%d]: %s (%s)\n", pcap_thread_status(&pt), pcap_statustostr(pcap_thread_status(&pt)), pcap_thread_errbuf(&pt));
+        exit(2);
+    }
+    if (ret) {
+        fprintf(stderr, "pcap_thread error [%d]: %s\n", ret, pcap_thread_strerr(ret));
         exit(2);
     }
 

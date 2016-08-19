@@ -74,7 +74,18 @@ extern "C" {
 #define PCAP_THREAD_NOPCAPS         7
 #define PCAP_THREAD_NOCALLBACK      8
 #define PCAP_THREAD_ERRNO           9
-#define PCAP_THREAD_NOSUPPORT       10
+#define PCAP_THREAD_NOYIELD         10
+
+#define PCAP_THREAD_EPCAP_STR       "libpcap error"
+#define PCAP_THREAD_ENOMEM_STR      "out of memory"
+#define PCAP_THREAD_ENOMON_STR      "monitor mode requested but not supported"
+#define PCAP_THREAD_ENODIR_STR      "direction specified but not supported"
+#define PCAP_THREAD_EINVAL_STR      "invalid argument"
+#define PCAP_THREAD_EWOULDBLOCK_STR "nonblocking pcap can not be added"
+#define PCAP_THREAD_NOPCAPS_STR     "nothing to capture on"
+#define PCAP_THREAD_NOCALLBACK_STR  "no callback set"
+#define PCAP_THREAD_ERRNO_STR       "system error, check errno"
+#define PCAP_THREAD_NOYIELD_STR     "queue more yield requested but not supported"
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
@@ -244,6 +255,7 @@ int pcap_thread_stop(pcap_thread_t* pcap_thread);
 
 int pcap_thread_status(const pcap_thread_t* pcap_thread);
 const char* pcap_thread_errbuf(const pcap_thread_t* pcap_thread);
+const char* pcap_thread_strerr(int error);
 
 #ifdef __cplusplus
 }
