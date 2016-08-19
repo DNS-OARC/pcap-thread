@@ -104,8 +104,8 @@ enum pcap_thread_queue_mode {
 #define PCAP_THREAD_T_INIT { \
     1, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_WAIT, PCAP_THREAD_T_INIT_QUEUE \
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
-    0, 0, 0, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
-    0, 0, { 0, 0 }, 1, 0, \
+    0, 0, PCAP_TSTAMP_PRECISION_MICRO, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
+    0, 0, { 0, 0 }, 1, PCAP_NETMASK_UNKNOWN, \
     PCAP_THREAD_DEFAULT_QUEUE_SIZE, 0, 0, \
     0, "", 0 \
 }
@@ -152,7 +152,7 @@ struct pcap_thread {
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
     0, 0, 0, \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0 \
 }
 #else
@@ -168,6 +168,7 @@ struct pcap_thread_pcaplist {
     void*                   user;
 #ifdef HAVE_PTHREAD
     pthread_t               thread;
+    int                     running;
     pthread_cond_t*         queue_cond;
     pthread_mutex_t*        queue_mutex;
     size_t                  queue_size;
@@ -229,6 +230,7 @@ int pcap_thread_set_callback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
 int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t dropback);
 
 int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void* user);
+int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user);
 int pcap_thread_add(pcap_thread_t* pcap_thread, pcap_t* pcap, void* user);
 int pcap_thread_close(pcap_thread_t* pcap_thread);
 

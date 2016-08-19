@@ -11,11 +11,14 @@ passed on to the callback.
 
 ## Usage
 
+Here is a short example how to use this helper, see the hexdump directory
+for a more complete example.
+
 ```c
 #include "config.h"
 #include "pcap-thread/pcap_thread.h"
 
-void callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt) {
+void callback(u_char* user, const struct pcap_pkthdr* packet_header, const u_char* packet, int datalink_type) {
     ...
 }
 
@@ -24,7 +27,7 @@ int main(void) {
 
     pcap_thread_set_snaplen(&pt, 65535);
     pcap_thread_set_filter(&pt, "port 80", 7);
-    pcap_thread_set_callback(&pt, packet);
+    pcap_thread_set_callback(&pt, callback);
     pcap_thread_open(&pt, "eth0", 0);
     pcap_thread_open(&pt, "lo", 0);
     pcap_thread_run(&pt);
