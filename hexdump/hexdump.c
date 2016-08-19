@@ -154,6 +154,7 @@ int main(int argc, char** argv) {
             verbose = 1;
             break;
         case 'H':
+#ifdef HAVE_PCAP_SET_TSTAMP_TYPE
             if (!strcmp("host", optarg))
                 err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_HOST);
             else if (!strcmp("host_lowprec", optarg))
@@ -166,14 +167,21 @@ int main(int argc, char** argv) {
                 err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_ADAPTER_UNSYNCED);
             else
                 err = -1;
+#else
+            err = -2;
+#endif
             break;
         case 'P':
+#ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
             if (!strcmp("micro", optarg))
                 err = pcap_thread_set_timestamp_precision(&pt, PCAP_TSTAMP_PRECISION_MICRO);
             else if (!strcmp("nano", optarg))
                 err = pcap_thread_set_timestamp_type(&pt, PCAP_TSTAMP_PRECISION_NANO);
             else
                 err = -1;
+#else
+            err = -2;
+#endif
             break;
         case 'h':
             printf(
@@ -194,9 +202,13 @@ int main(int argc, char** argv) {
 " -r <file>          pcap savefile (multiple)\n"
 " -W <usec>          queue wait\n"
 " -v                 verbose\n"
+#ifdef HAVE_PCAP_SET_TSTAMP_TYPE
 " -H <type>          timestamp type: host, host_lowprec, host_hiprec, adapter\n"
 "                    or adapter_unsynced\n"
+#endif
+#ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 " -P <type>          timestamp precision: micro or nano\n"
+#endif
 " -h                 this\n"
             );
             exit(0);
@@ -205,6 +217,10 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (err == -2) {
+        fprintf(stderr, "Unsupported argument(s)\n");
+        exit(1);
+    }
     if (err == -1) {
         fprintf(stderr, "Invalid argument(s)\n");
         exit(1);
