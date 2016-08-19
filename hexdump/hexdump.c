@@ -5,29 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
-void callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, int dlt) {
+void callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt) {
     bpf_u_int32 i;
 
     if (user) {
-        printf("ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
-            pkthdr->ts.tv_sec, pkthdr->ts.tv_usec,
-            pkthdr->caplen,
-            pkthdr->len,
-            pcap_datalink_val_to_name(dlt)
-        );
-    }
-    for (i = 0; i < pkthdr->caplen; i++) {
-        printf("%02x", pkt[i]);
-    }
-    printf("\n");
-}
-
-void dropback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, int dlt) {
-    bpf_u_int32 i;
-
-    if (user) {
-        printf("dropped ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+        printf("name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+            name,
             pkthdr->ts.tv_sec, pkthdr->ts.tv_usec,
             pkthdr->caplen,
             pkthdr->len,
@@ -35,7 +20,7 @@ void dropback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt,
         );
     }
     else {
-        printf("!");
+        printf("%s ", name);
     }
     for (i = 0; i < pkthdr->caplen; i++) {
         printf("%02x", pkt[i]);
@@ -43,21 +28,69 @@ void dropback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt,
     printf("\n");
 }
 
+void dropback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt) {
+    bpf_u_int32 i;
+
+    if (user) {
+        printf("dropped name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+            name,
+            pkthdr->ts.tv_sec, pkthdr->ts.tv_usec,
+            pkthdr->caplen,
+            pkthdr->len,
+            pcap_datalink_val_to_name(dlt)
+        );
+    }
+    else {
+        printf("!%s ", name);
+    }
+    for (i = 0; i < pkthdr->caplen; i++) {
+        printf("%02x", pkt[i]);
+    }
+    printf("\n");
+}
+
+void stat_callback(u_char* user, const struct pcap_stat* stats, const char* name, int dlt) {
+    if (user) {
+        printf("stats name:%s datalink:%s received:%u dropped:%u ifdropped:%u\n",
+            name,
+            pcap_datalink_val_to_name(dlt),
+            stats->ps_recv,
+            stats->ps_drop,
+            stats->ps_ifdrop
+        );
+    }
+    else {
+        printf("+%s %u %u %u\n", name, stats->ps_recv, stats->ps_drop, stats->ps_ifdrop);
+    }
+}
+
+pcap_thread_t pt = PCAP_THREAD_T_INIT;
+
+void stop(int signum) {
+    pcap_thread_stop(&pt);
+}
+
 #define MAX_INTERFACES 64
 #define MAX_FILTER_SIZE 4096
 
 int main(int argc, char** argv) {
-    pcap_thread_t pt = PCAP_THREAD_T_INIT;
-    int flags, opt, err = 0, ret = 0, interface = 0, verbose = 0, i;
+    int flags, opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0;
     char* interfaces[MAX_INTERFACES];
     char is_file[MAX_INTERFACES];
     char filter[MAX_FILTER_SIZE];
     char* filterp = filter;
     size_t filter_left = MAX_FILTER_SIZE;
+    struct sigaction sa;
 
     memset(is_file, 0, MAX_INTERFACES);
+    memset(&sa, 0, sizeof(struct sigaction));
 
-    while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:h")) != -1) {
+    sa.sa_handler = stop;
+    sigfillset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, 0);
+    sigaction(SIGHUP, &sa, 0);
+
+    while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hD")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -209,9 +242,13 @@ int main(int argc, char** argv) {
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 " -P <type>          timestamp precision: micro or nano\n"
 #endif
+" -D                 display stats on exit\n"
 " -h                 this\n"
             );
             exit(0);
+        case 'D':
+            stats = 1;
+            break;
         default:
             err = -1;
         }
@@ -330,7 +367,9 @@ int main(int argc, char** argv) {
             fprintf(stderr, "open ");
         else if ((ret = pcap_thread_run(&pt)))
             fprintf(stderr, "run ");
-        else if ((ret = pcap_thread_close(&pt)))
+        else if (stats && (ret = pcap_thread_stats(&pt, stat_callback, verbose ? (u_char*)1 : 0)))
+            fprintf(stderr, "stats ");
+        else if (!ret && (ret = pcap_thread_close(&pt)))
             fprintf(stderr, "close ");
     }
 
