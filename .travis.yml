@@ -1,0 +1,13 @@
+language: c
+compiler:
+  - clang
+  - gcc
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libpcap-dev
+script:
+  - cd hexdump
+  - sh autogen.sh
+  - ./configure
+  - make
+  - ./hexdump -h
