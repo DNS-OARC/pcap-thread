@@ -156,7 +156,7 @@ int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_que
             break;
         case PCAP_THREAD_QUEUE_MODE_YIELD:
 #ifndef HAVE_SCHED_YIELD
-            return PCAP_THREAD_NOSUPPORT;
+            return PCAP_THREAD_NOYIELD;
 #else
             break;
 #endif
@@ -1067,4 +1067,32 @@ const char* pcap_thread_errbuf(const pcap_thread_t* pcap_thread) {
     }
 
     return pcap_thread->errbuf;
+}
+
+const char* pcap_thread_strerr(int error) {
+    switch (error) {
+        case PCAP_THREAD_OK:
+            return 0;
+        case PCAP_THREAD_EPCAP:
+            return PCAP_THREAD_EPCAP_STR;
+        case PCAP_THREAD_ENOMEM:
+            return PCAP_THREAD_ENOMEM_STR;
+        case PCAP_THREAD_ENOMON:
+            return PCAP_THREAD_ENOMON_STR;
+        case PCAP_THREAD_ENODIR:
+            return PCAP_THREAD_ENODIR_STR;
+        case PCAP_THREAD_EINVAL:
+            return PCAP_THREAD_EINVAL_STR;
+        case PCAP_THREAD_EWOULDBLOCK:
+            return PCAP_THREAD_EWOULDBLOCK_STR;
+        case PCAP_THREAD_NOPCAPS:
+            return PCAP_THREAD_NOPCAPS_STR;
+        case PCAP_THREAD_NOCALLBACK:
+            return PCAP_THREAD_NOCALLBACK_STR;
+        case PCAP_THREAD_ERRNO:
+            return PCAP_THREAD_ERRNO_STR;
+        case PCAP_THREAD_NOYIELD:
+            return PCAP_THREAD_NOYIELD_STR;
+    }
+    return "UNKNOWN";
 }
