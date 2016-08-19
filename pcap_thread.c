@@ -482,6 +482,8 @@ int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
  * Open/Close
  */
 
+static pcap_thread_pcaplist_t _pcaplist_default = PCAP_THREAD_PCAPLIST_T_INIT;
+
 int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user) {
     pcap_t*                 pcap;
     pcap_thread_pcaplist_t* pcaplist;
@@ -495,9 +497,10 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
 
     memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
     pcap_thread->status = 0;
-    if (!(pcaplist = calloc(1, sizeof(pcap_thread_pcaplist_t)))) {
+    if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
         return PCAP_THREAD_ENOMEM;
     }
+    memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
 
 #ifdef HAVE_PCAP_CREATE
     if (!(pcap = pcap_create(device, pcap_thread->errbuf))) {
@@ -591,7 +594,62 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
 #else /* HAVE_PCAP_CREATE */
     if (!(pcap = pcap_open_live(device, pcap_thread->snaplen, pcap_thread->promiscuous, pcap_thread->timeout, pcap_thread->errbuf))) {
         free(pcaplist);
-        pcap_close(pcap);
+        return PCAP_THREAD_EPCAP;
+    }
+#endif
+
+    if (pcap_thread->filter) {
+        if ((pcap_thread->status = pcap_compile(pcap, &(pcap_thread->bpf), pcap_thread->filter, pcap_thread->filter_optimize, pcap_thread->filter_netmask))) {
+            free(pcaplist);
+            pcap_close(pcap);
+            return PCAP_THREAD_EPCAP;
+        }
+        if ((pcap_thread->status = pcap_setfilter(pcap, &(pcap_thread->bpf)))) {
+            free(pcaplist);
+            pcap_close(pcap);
+            return PCAP_THREAD_EPCAP;
+        }
+    }
+
+    pcaplist->pcap = pcap;
+    pcaplist->user = user;
+    if (pcap_thread->pcaplist) {
+        pcaplist->next = pcap_thread->pcaplist;
+    }
+    pcap_thread->pcaplist = pcaplist;
+    if (pcap_snapshot(pcap) > pcap_thread->snapshot) {
+        pcap_thread->snapshot = pcap_snapshot(pcap);
+    }
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user) {
+    pcap_t*                 pcap;
+    pcap_thread_pcaplist_t* pcaplist;
+
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (!file) {
+        return PCAP_THREAD_EINVAL;
+    }
+
+    memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    pcap_thread->status = 0;
+    if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
+        return PCAP_THREAD_ENOMEM;
+    }
+    memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+
+#ifdef HAVE_PCAP_OPEN_OFFLINE_WITH_TSTAMP_PRECISION
+    if (!(pcap = pcap_open_offline_with_tstamp_precision(file, pcap_thread->timestamp_precision, pcap_thread->errbuf))) {
+        free(pcaplist);
+        return PCAP_THREAD_EPCAP;
+    }
+#else
+    if (!(pcap = pcap_open_offline(file, pcap_thread->errbuf))) {
+        free(pcaplist);
         return PCAP_THREAD_EPCAP;
     }
 #endif
@@ -644,9 +702,10 @@ int pcap_thread_add(pcap_thread_t* pcap_thread, pcap_t* pcap, void* user) {
         return PCAP_THREAD_EWOULDBLOCK;
     }
 
-    if (!(pcaplist = calloc(1, sizeof(pcap_thread_pcaplist_t)))) {
+    if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
         return PCAP_THREAD_ENOMEM;
     }
+    memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
 
     pcaplist->pcap = pcap;
     pcaplist->user = user;
@@ -750,6 +809,13 @@ static void* _thread(void* vp) {
     if (ret == -2) {
     }
 
+    pcaplist->running = 0;
+    if (pcaplist->queue_cond && pcaplist->queue_mutex) {
+        pthread_mutex_lock(pcaplist->queue_mutex);
+        pthread_cond_signal(pcaplist->queue_cond);
+        pthread_mutex_unlock(pcaplist->queue_mutex);
+    }
+
     return 0;
 }
 #endif
@@ -828,6 +894,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 pcaplist->queue_cond = 0;
                 pcaplist->queue_mutex = 0;
             }
+            pcaplist->running = 1;
 
             if (!(pcaplist->queue = calloc(pcaplist->queue_size, sizeof(char)))) {
                 return PCAP_THREAD_ENOMEM;
@@ -867,9 +934,16 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
 #endif
             }
 
+            run = 0;
             for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
-                if (!pcaplist->thread) {
-                    run = 0;
+                if (!pcaplist->running) {
+                    if (pcaplist->thread) {
+                        pthread_join(pcaplist->thread, 0);
+                        pcaplist->thread = 0;
+                    }
+                }
+                else {
+                    run = 1;
                 }
                 while (pcaplist->queue[pcaplist->read_pos]) {
                     pcap_thread->callback(
