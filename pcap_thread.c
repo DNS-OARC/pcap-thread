@@ -501,6 +501,10 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
         return PCAP_THREAD_ENOMEM;
     }
     memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+    if (!(pcaplist->name = strdup(device))) {
+        free(pcaplist);
+        return PCAP_THREAD_ENOMEM;
+    }
 
 #ifdef HAVE_PCAP_CREATE
     if (!(pcap = pcap_create(device, pcap_thread->errbuf))) {
@@ -641,6 +645,10 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
         return PCAP_THREAD_ENOMEM;
     }
     memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+    if (!(pcaplist->name = strdup(file))) {
+        free(pcaplist);
+        return PCAP_THREAD_ENOMEM;
+    }
 
 #ifdef HAVE_PCAP_OPEN_OFFLINE_WITH_TSTAMP_PRECISION
     if (!(pcap = pcap_open_offline_with_tstamp_precision(file, pcap_thread->timestamp_precision, pcap_thread->errbuf))) {
@@ -680,7 +688,7 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
     return PCAP_THREAD_OK;
 }
 
-int pcap_thread_add(pcap_thread_t* pcap_thread, pcap_t* pcap, void* user) {
+int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, void* user) {
     pcap_thread_pcaplist_t* pcaplist;
     int nonblock;
 
@@ -706,6 +714,10 @@ int pcap_thread_add(pcap_thread_t* pcap_thread, pcap_t* pcap, void* user) {
         return PCAP_THREAD_ENOMEM;
     }
     memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+    if (!(pcaplist->name = strdup(name))) {
+        free(pcaplist);
+        return PCAP_THREAD_ENOMEM;
+    }
 
     pcaplist->pcap = pcap;
     pcaplist->user = user;
@@ -731,6 +743,9 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
         pcaplist = pcap_thread->pcaplist;
         pcap_thread->pcaplist = pcaplist->next;
 
+        if (pcaplist->name) {
+            free(pcaplist->name);
+        }
         if (pcaplist->pcap) {
             pcap_close(pcaplist->pcap);
         }
@@ -775,7 +790,7 @@ static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_ch
         || pkthdr->caplen > pcaplist->snapshot)
     {
         if (pcaplist->dropback) {
-            pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcap_datalink(pcaplist->pcap));
+            pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
         }
         return;
     }
@@ -828,7 +843,7 @@ static void _callback2(u_char* user, const struct pcap_pkthdr* pkthdr, const u_c
     }
     pcaplist = (pcap_thread_pcaplist_t*)user;
 
-    pcaplist->callback(pcaplist->user, pkthdr, pkt, pcap_datalink(pcaplist->pcap));
+    pcaplist->callback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
 }
 
 int pcap_thread_run(pcap_thread_t* pcap_thread) {
@@ -950,6 +965,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                         pcaplist->user,
                         &(pcaplist->pkthdr[pcaplist->read_pos]),
                         &(pcaplist->pkt[pcaplist->read_pos * pcaplist->snapshot]),
+                        pcaplist->name,
                         pcap_datalink(pcaplist->pcap)
                     );
 
@@ -1044,6 +1060,35 @@ int pcap_thread_stop(pcap_thread_t* pcap_thread) {
 #endif
     {
         pcap_breakloop(pcaplist->pcap);
+    }
+
+    return PCAP_THREAD_OK;
+}
+
+/*
+ * Stats
+ */
+
+int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t callback, u_char* user) {
+    pcap_thread_pcaplist_t* pcaplist;
+    struct pcap_stat stats;
+
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (!callback) {
+        return PCAP_THREAD_NOCALLBACK;
+    }
+    if (!pcap_thread->pcaplist) {
+        return PCAP_THREAD_NOPCAPS;
+    }
+
+    for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+        if ((pcap_thread->status = pcap_stats(pcaplist->pcap, &stats))) {
+            strncpy(pcap_thread->errbuf, pcap_geterr(pcaplist->pcap), sizeof(pcap_thread->errbuf));
+            return PCAP_THREAD_EPCAP;
+        }
+        callback(user, &stats, pcaplist->name, pcap_datalink(pcaplist->pcap));
     }
 
     return PCAP_THREAD_OK;

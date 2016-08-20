@@ -89,7 +89,8 @@ extern "C" {
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
-typedef void (*pcap_thread_callback_t)(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const int dlt);
+typedef void (*pcap_thread_callback_t)(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt);
+typedef void (*pcap_thread_stats_callback_t)(u_char* user, const struct pcap_stat* stats, const char* name, int dlt);
 #ifndef HAVE_PCAP_DIRECTION_T
 typedef int pcap_direction_t;
 #endif
@@ -167,19 +168,20 @@ struct pcap_thread {
 
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
-    0, 0, 0, \
+    0, 0, 0, 0, \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0 \
 }
 #else
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
-    0, 0, 0, \
+    0, 0, 0, 0, \
     0 \
 }
 #endif
 
 struct pcap_thread_pcaplist {
     pcap_thread_pcaplist_t* next;
+    char*                   name;
     pcap_t*                 pcap;
     void*                   user;
 #ifdef HAVE_PTHREAD
@@ -247,11 +249,13 @@ int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
 
 int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void* user);
 int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user);
-int pcap_thread_add(pcap_thread_t* pcap_thread, pcap_t* pcap, void* user);
+int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, void* user);
 int pcap_thread_close(pcap_thread_t* pcap_thread);
 
 int pcap_thread_run(pcap_thread_t* pcap_thread);
 int pcap_thread_stop(pcap_thread_t* pcap_thread);
+
+int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t callback, u_char* user);
 
 int pcap_thread_status(const pcap_thread_t* pcap_thread);
 const char* pcap_thread_errbuf(const pcap_thread_t* pcap_thread);
