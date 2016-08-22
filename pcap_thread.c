@@ -104,8 +104,6 @@ pcap_thread_t* pcap_thread_create(void) {
 }
 
 void pcap_thread_free(pcap_thread_t* pcap_thread) {
-    pcap_thread_pcaplist_t* pcaplist;
-
     if (!pcap_thread) {
         return;
     }
@@ -1059,7 +1057,9 @@ int pcap_thread_stop(pcap_thread_t* pcap_thread) {
     else
 #endif
     {
-        pcap_breakloop(pcaplist->pcap);
+        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+            pcap_breakloop(pcaplist->pcap);
+        }
     }
 
     return PCAP_THREAD_OK;
