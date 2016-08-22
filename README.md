@@ -62,6 +62,8 @@ AX_PCAP_THREAD
 
 ```m4
 AM_CFLAGS += $(PTHREAD_CFLAGS)
+AM_CPPFLAGS += $(PTHREAD_CFLAGS)
+AM_CXXFLAGS += $(PTHREAD_CFLAGS)
 
 program_SOURCES += pcap-thread/pcap-thread.c
 dist_program_SOURCES += pcap-thread/pcap-thread.h
