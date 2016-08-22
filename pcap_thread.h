@@ -184,9 +184,9 @@ struct pcap_thread_pcaplist {
     char*                   name;
     pcap_t*                 pcap;
     void*                   user;
+    int                     running;
 #ifdef HAVE_PTHREAD
     pthread_t               thread;
-    int                     running;
     pthread_cond_t*         queue_cond;
     pthread_mutex_t*        queue_mutex;
     size_t                  queue_size;
