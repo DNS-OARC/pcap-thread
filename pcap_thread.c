@@ -1001,6 +1001,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 return PCAP_THREAD_EPCAP;
             }
             pcaplist->callback = pcap_thread->callback;
+            pcaplist->running = 1;
         }
 
         t1.tv_sec = pcap_thread->timeout / 1000;
@@ -1013,15 +1014,24 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 return PCAP_THREAD_ERRNO;
             }
 
+            run = 0;
             for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
-                int packets = pcap_dispatch(pcaplist->pcap, -1, _callback2, (u_char*)pcaplist);
+                int packets;
 
+                if (!pcaplist->running) {
+                    continue;
+                }
+                else {
+                    run = 1;
+                }
+
+                packets = pcap_dispatch(pcaplist->pcap, -1, _callback2, (u_char*)pcaplist);
                 if (packets == -1) {
                     pcap_thread->status = -1;
                     return PCAP_THREAD_EPCAP;
                 }
                 else if (packets == -2) {
-                    run = 0;
+                    pcaplist->running = 0;
                 }
             }
         }

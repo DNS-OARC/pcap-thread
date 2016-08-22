@@ -41,6 +41,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
+#include <errno.h>
+
+pcap_thread_t pt = PCAP_THREAD_T_INIT;
+time_t start_time = 0;
+time_t exit_after_time = 0;
 
 void callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt) {
     bpf_u_int32 i;
@@ -61,6 +67,10 @@ void callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt,
         printf("%02x", pkt[i]);
     }
     printf("\n");
+
+    if (exit_after_time && (start_time + exit_after_time) < time(0)) {
+        pcap_thread_stop(&pt);
+    }
 }
 
 void dropback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt) {
@@ -99,14 +109,24 @@ void stat_callback(u_char* user, const struct pcap_stat* stats, const char* name
     }
 }
 
-pcap_thread_t pt = PCAP_THREAD_T_INIT;
-
 void stop(int signum) {
     pcap_thread_stop(&pt);
 }
 
 #define MAX_INTERFACES 64
 #define MAX_FILTER_SIZE 4096
+
+#ifdef HAVE_PTHREAD
+void* exit_after(void* vp) {
+    struct timeval t;
+
+    t.tv_sec = exit_after_time;
+    t.tv_usec = 0;
+    select(1, 0, 0, 0, &t);
+    pcap_thread_stop(&pt);
+    return 0;
+}
+#endif
 
 int main(int argc, char** argv) {
     int opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0;
@@ -116,16 +136,29 @@ int main(int argc, char** argv) {
     char* filterp = filter;
     size_t filter_left = MAX_FILTER_SIZE;
     struct sigaction sa;
+#ifdef HAVE_PTHREAD
+    pthread_t exit_after_thread = 0;
+#endif
 
     memset(is_file, 0, MAX_INTERFACES);
     memset(&sa, 0, sizeof(struct sigaction));
 
     sa.sa_handler = stop;
     sigfillset(&sa.sa_mask);
-    sigaction(SIGINT, &sa, 0);
-    sigaction(SIGHUP, &sa, 0);
+    if ((ret = sigaction(SIGINT, &sa, 0))) {
+        fprintf(stderr, "sigaction(SIGINT) error %d: %s\n", errno, strerror(errno));
+        exit(4);
+    }
+    if ((ret = sigaction(SIGHUP, &sa, 0))) {
+        fprintf(stderr, "sigaction(SIGHUP) error %d: %s\n", errno, strerror(errno));
+        exit(4);
+    }
+    if ((ret = sigaction(SIGALRM, &sa, 0))) {
+        fprintf(stderr, "sigaction(SIGALRM) error %d: %s\n", errno, strerror(errno));
+        exit(4);
+    }
 
-    while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hDV")) != -1) {
+    while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hDVA:")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -254,6 +287,7 @@ int main(int argc, char** argv) {
         case 'h':
             printf(
 "usage: hexdump [options] [filter]\n"
+" -A <secs>          exit after a number of seconds\n"
 " -T <0|1>           use/not use threads\n"
 " -M <mode>          queue mode: cond, wait or yield\n"
 " -s <len>           snap length\n"
@@ -291,6 +325,9 @@ int main(int argc, char** argv) {
                 PCAP_THREAD_VERSION_STR
             );
             exit(0);
+        case 'A':
+            exit_after_time = atoi(optarg);
+            break;
         default:
             err = -1;
         }
@@ -378,6 +415,18 @@ int main(int argc, char** argv) {
         printf("filter: %s\n", filter);
     }
 
+    if (exit_after_time) {
+        start_time = time(0);
+#ifdef HAVE_PTHREAD
+        if ((ret = pthread_create(&exit_after_thread, 0, exit_after, 0))) {
+            fprintf(stderr, "pthread_create error %d: %s\n", ret, strerror(ret));
+            exit(4);
+        }
+#else
+        alarm(exit_after_time);
+#endif
+    }
+
     if (filterp != filter && (ret = pcap_thread_set_filter(&pt, filter, filterp - filter)))
         fprintf(stderr, "filter ");
     else if ((ret = pcap_thread_set_callback(&pt, callback)))
@@ -414,6 +463,13 @@ int main(int argc, char** argv) {
         else if (!ret && (ret = pcap_thread_close(&pt)))
             fprintf(stderr, "close ");
     }
+
+#ifdef HAVE_PTHREAD
+    if (exit_after_thread) {
+        pthread_cancel(exit_after_thread);
+        pthread_join(exit_after_thread, 0);
+    }
+#endif
 
     if (ret == PCAP_THREAD_EPCAP) {
         fprintf(stderr, "pcap error [%d]: %s (%s)\n", pcap_thread_status(&pt), pcap_statustostr(pcap_thread_status(&pt)), pcap_thread_errbuf(&pt));
