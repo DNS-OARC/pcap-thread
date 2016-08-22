@@ -109,7 +109,7 @@ void stop(int signum) {
 #define MAX_FILTER_SIZE 4096
 
 int main(int argc, char** argv) {
-    int flags, opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0;
+    int opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0;
     char* interfaces[MAX_INTERFACES];
     char is_file[MAX_INTERFACES];
     char filter[MAX_FILTER_SIZE];

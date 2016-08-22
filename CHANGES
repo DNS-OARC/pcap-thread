@@ -1,3 +1,10 @@
+2016-08-22 Jerry Lundström
+
+    Release 1.0.1
+
+    b475589 Use -Wall when compiling, fix a few warnings and a oops in
+            `pcap_thread_stop()`
+
 2016-08-21 Jerry Lundström
 
     Release 1.0.0

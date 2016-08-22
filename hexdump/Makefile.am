@@ -34,7 +34,7 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = pcap_thread.c pcap_thread.h
 
-AM_CFLAGS = -I$(srcdir) $(PTHREAD_CFLAGS)
+AM_CFLAGS = -Wall -I$(srcdir) $(PTHREAD_CFLAGS)
 
 bin_PROGRAMS    = hexdump
 

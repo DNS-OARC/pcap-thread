@@ -1,5 +1,7 @@
 # pcap-thread
 
+[![Build Status](https://travis-ci.org/DNS-OARC/pcap-thread.svg?branch=develop)](https://travis-ci.org/DNS-OARC/pcap-thread)
+
 PCAP helper library with POSIX threads support
 
 ## About
