@@ -41,6 +41,8 @@
 #endif
 
 #include <pcap/pcap.h>
+#include <sys/time.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,7 +126,7 @@ enum pcap_thread_queue_mode {
     0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
     0, 0, { 0, 0 }, 1, PCAP_NETMASK_UNKNOWN, \
     PCAP_THREAD_DEFAULT_QUEUE_SIZE, 0, 0, \
-    0, "", 0 \
+    0, "", 0, { 0, 0 } \
 }
 
 struct pcap_thread {
@@ -164,6 +166,8 @@ struct pcap_thread {
     int                     status;
 	char                    errbuf[PCAP_ERRBUF_SIZE];
     pcap_thread_pcaplist_t* pcaplist;
+
+    struct timeval          timedrun;
 };
 
 #ifdef HAVE_PTHREAD
@@ -240,6 +244,8 @@ int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter_optimize);
 bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask);
+struct timeval pcap_thread_timedrun(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun);
 
 size_t pcap_thread_queue_size(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_size);

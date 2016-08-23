@@ -430,6 +430,25 @@ int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32
     return PCAP_THREAD_OK;
 }
 
+struct timeval pcap_thread_timedrun(const pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        static struct timeval tv = { 0, 0 };
+        return tv;
+    }
+
+    return pcap_thread->timedrun;
+}
+
+int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+
+    pcap_thread->timedrun = timedrun;
+
+    return PCAP_THREAD_OK;
+}
+
 /*
  * Queue
  */
@@ -846,7 +865,9 @@ static void _callback2(u_char* user, const struct pcap_pkthdr* pkthdr, const u_c
 
 int pcap_thread_run(pcap_thread_t* pcap_thread) {
     pcap_thread_pcaplist_t* pcaplist;
-    int run = 1;
+    int run = 1, timedrun = 0;
+    struct timeval start = { 0, 0 };
+    struct timespec end;
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -856,6 +877,17 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
     }
     if (!pcap_thread->callback) {
         return PCAP_THREAD_NOCALLBACK;
+    }
+
+    if (pcap_thread->timedrun.tv_sec || pcap_thread->timedrun.tv_usec) {
+        timedrun = 1;
+        if (gettimeofday(&start, 0)) {
+            return PCAP_THREAD_ERRNO;
+        }
+
+        end.tv_sec = start.tv_sec + pcap_thread->timedrun.tv_sec
+            + ( ( start.tv_usec + pcap_thread->timedrun.tv_usec ) / 1000000 );
+        end.tv_nsec = ( ( start.tv_usec + pcap_thread->timedrun.tv_usec ) % 1000000 ) * 1000;
     }
 
 #ifdef HAVE_PTHREAD
@@ -910,12 +942,15 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             pcaplist->running = 1;
 
             if (!(pcaplist->queue = calloc(pcaplist->queue_size, sizeof(char)))) {
+                pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
             if (!(pcaplist->pkthdr = calloc(pcaplist->queue_size, sizeof(struct pcap_pkthdr)))) {
+                pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
             if (!(pcaplist->pkt = calloc(pcaplist->queue_size, pcap_thread->snapshot))) {
+                pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
 
@@ -929,7 +964,16 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         while (run && pcap_thread->queue_run) {
             switch (pcap_thread->queue_mode) {
                 case PCAP_THREAD_QUEUE_MODE_COND:
+                    if (timedrun) {
+                        if ((err = pthread_cond_timedwait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex), &end)) && err != ETIMEDOUT) {
+                            pcap_thread_stop(pcap_thread);
+                            errno = err;
+                            return PCAP_THREAD_ERRNO;
+                        }
+                        break;
+                    }
                     if ((err = pthread_cond_wait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex)))) {
+                        pcap_thread_stop(pcap_thread);
                         errno = err;
                         return PCAP_THREAD_ERRNO;
                     }
@@ -972,6 +1016,21 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     if (pcaplist->read_pos == pcaplist->queue_size) {
                         pcaplist->read_pos = 0;
                     }
+                }
+            }
+
+            if (run && timedrun) {
+                struct timeval now;
+
+                if (gettimeofday(&now, 0)) {
+                    pcap_thread_stop(pcap_thread);
+                    return PCAP_THREAD_ERRNO;
+                }
+
+                if (now.tv_sec > end.tv_sec
+                    || (now.tv_sec == end.tv_sec && (now.tv_usec*1000) >= end.tv_nsec))
+                {
+                    run = 0;
                 }
             }
         }
@@ -1032,6 +1091,20 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 }
                 else if (packets == -2) {
                     pcaplist->running = 0;
+                }
+            }
+
+            if (run && timedrun) {
+                struct timeval now;
+
+                if (gettimeofday(&now, 0)) {
+                    return PCAP_THREAD_ERRNO;
+                }
+
+                if (now.tv_sec > end.tv_sec
+                    || (now.tv_sec == end.tv_sec && (now.tv_usec*1000) >= end.tv_nsec))
+                {
+                    run = 0;
                 }
             }
         }
