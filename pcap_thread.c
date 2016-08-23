@@ -512,7 +512,9 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
         return PCAP_THREAD_EINVAL;
     }
 
-    memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    if (pcap_thread->errbuf[0]) {
+        memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    }
     pcap_thread->status = 0;
     if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
         return PCAP_THREAD_ENOMEM;
@@ -656,7 +658,9 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
         return PCAP_THREAD_EINVAL;
     }
 
-    memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    if (pcap_thread->errbuf[0]) {
+        memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    }
     pcap_thread->status = 0;
     if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
         return PCAP_THREAD_ENOMEM;
@@ -716,7 +720,9 @@ int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, 
         return PCAP_THREAD_EINVAL;
     }
 
-    memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    if (pcap_thread->errbuf[0]) {
+        memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    }
     pcap_thread->status = 0;
 
     nonblock = pcap_getnonblock(pcap, pcap_thread->errbuf);
@@ -878,6 +884,11 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
     if (!pcap_thread->callback) {
         return PCAP_THREAD_NOCALLBACK;
     }
+
+    if (pcap_thread->errbuf[0]) {
+        memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    }
+    pcap_thread->status = 0;
 
     if (pcap_thread->timedrun.tv_sec || pcap_thread->timedrun.tv_usec) {
         timedrun = 1;
@@ -1045,9 +1056,6 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         int max_fd = 0;
         struct timeval t1, t2;
 
-        memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
-        pcap_thread->status = 0;
-
         FD_ZERO(&fds);
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
             int fd = pcap_get_selectable_fd(pcaplist->pcap);
@@ -1109,6 +1117,39 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             }
         }
     }
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_next(pcap_thread_t* pcap_thread) {
+    const u_char* pkt;
+    struct pcap_pkthdr pkthdr;
+
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (!pcap_thread->pcaplist) {
+        return PCAP_THREAD_NOPCAPS;
+    }
+
+    if (pcap_thread->errbuf[0]) {
+        memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    }
+    pcap_thread->status = 0;
+
+    if (!pcap_thread->step) {
+        pcap_thread->step = pcap_thread->pcaplist;
+    }
+    if (!pcap_thread->step) {
+        return PCAP_THREAD_OK;
+    }
+
+    if (!(pkt = pcap_next(pcap_thread->step->pcap, &pkthdr))) {
+        pcap_thread->status = -1;
+        return PCAP_THREAD_EPCAP;
+    }
+    pcap_thread->callback(pcap_thread->step->user, &pkthdr, pkt, pcap_thread->step->name, pcap_datalink(pcap_thread->step->pcap));
+    pcap_thread->step = pcap_thread->step->next;
 
     return PCAP_THREAD_OK;
 }

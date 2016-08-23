@@ -126,7 +126,7 @@ enum pcap_thread_queue_mode {
     0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
     0, 0, { 0, 0 }, 1, PCAP_NETMASK_UNKNOWN, \
     PCAP_THREAD_DEFAULT_QUEUE_SIZE, 0, 0, \
-    0, "", 0, { 0, 0 } \
+    0, "", 0, 0, { 0, 0 } \
 }
 
 struct pcap_thread {
@@ -166,6 +166,7 @@ struct pcap_thread {
     int                     status;
 	char                    errbuf[PCAP_ERRBUF_SIZE];
     pcap_thread_pcaplist_t* pcaplist;
+    pcap_thread_pcaplist_t* step;
 
     struct timeval          timedrun;
 };
@@ -259,6 +260,7 @@ int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, 
 int pcap_thread_close(pcap_thread_t* pcap_thread);
 
 int pcap_thread_run(pcap_thread_t* pcap_thread);
+int pcap_thread_next(pcap_thread_t* pcap_thread);
 int pcap_thread_stop(pcap_thread_t* pcap_thread);
 
 int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t callback, u_char* user);
