@@ -110,8 +110,19 @@ void stop(int signum) {
 #define MAX_INTERFACES 64
 #define MAX_FILTER_SIZE 4096
 
+int do_next(int cnt) {
+    int ret;
+
+    while (cnt--) {
+        if ((ret = pcap_thread_next(&pt))) {
+            return ret;
+        }
+    }
+    return PCAP_THREAD_OK;
+}
+
 int main(int argc, char** argv) {
-    int opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0;
+    int opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0, cnt = 0;
     char* interfaces[MAX_INTERFACES];
     char is_file[MAX_INTERFACES];
     char filter[MAX_FILTER_SIZE];
@@ -134,7 +145,7 @@ int main(int argc, char** argv) {
         exit(4);
     }
 
-    while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hDVA:")) != -1) {
+    while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hDVA:c:")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -264,6 +275,7 @@ int main(int argc, char** argv) {
             printf(
 "usage: hexdump [options] [filter]\n"
 " -A <secs>          exit after a number of seconds\n"
+" -c <count>         process count packets then exit\n"
 " -T <0|1>           use/not use threads\n"
 " -M <mode>          queue mode: cond, wait or yield\n"
 " -s <len>           snap length\n"
@@ -303,6 +315,9 @@ int main(int argc, char** argv) {
             exit(0);
         case 'A':
             exit_after_time = atoi(optarg);
+            break;
+        case 'c':
+            cnt = atoi(optarg);
             break;
         default:
             err = -1;
@@ -431,7 +446,9 @@ int main(int argc, char** argv) {
 
         if (ret)
             fprintf(stderr, "open ");
-        else if ((ret = pcap_thread_run(&pt)))
+        else if (cnt && (ret = do_next(cnt)))
+            fprintf(stderr, "next ");
+        else if (!cnt && (ret = pcap_thread_run(&pt)))
             fprintf(stderr, "run ");
         else if (stats && (ret = pcap_thread_stats(&pt, stat_callback, verbose ? (u_char*)1 : 0)))
             fprintf(stderr, "stats ");
