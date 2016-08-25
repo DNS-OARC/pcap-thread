@@ -1,3 +1,35 @@
+2016-08-25 Jerry Lundström
+
+    Release 1.1.0
+
+    New features:
+    - `pcap_thread_next()`, will step through the pcaps and process
+      one packet at a time starting with the first pcap open/add'ed
+      and then looping around.
+    - `pcap_thread_next_reset()`, resets the internal so that next
+      call with `pcap_thread_next()` will start again with the first
+      pcap open/add'ed.
+    - `pcap_thread_timedrun()`/`pcap_thread_set_timedrun()` can be
+      used to do a timed run which means that `pcap_thread_run()` will
+      return a short while after the `struct timeval` time has passed.
+    - New options to `hexdump`:
+      `-A <secs>`          exit after a number of seconds
+      `-c <count>`         process count packets then exit
+
+    Bug/tweak fixes:
+    - Fix behavior of the none threaded engine part of `pcap_thread_run()`,
+      will end only after all pcaps are done.
+    - Various error handling
+
+    Commits:
+
+    88715da Add `pcap_thread_next_reset()` to reset the stepping and
+            begin all over again
+    582c63d Taking the next step
+    281ebe4 Timed run and errors
+    76d1739 No threads, same behavior
+    7186e31 Update README with CPP/CXX flags for C++
+
 2016-08-22 Jerry Lundström
 
     Release 1.0.1

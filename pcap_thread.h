@@ -41,15 +41,17 @@
 #endif
 
 #include <pcap/pcap.h>
+#include <sys/time.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define PCAP_THREAD_VERSION_STR     "1.0.1"
+#define PCAP_THREAD_VERSION_STR     "1.1.0"
 #define PCAP_THREAD_VERSION_MAJOR   1
-#define PCAP_THREAD_VERSION_MINOR   0
-#define PCAP_THREAD_VERSION_PATCH   1
+#define PCAP_THREAD_VERSION_MINOR   1
+#define PCAP_THREAD_VERSION_PATCH   0
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT     1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE  64
@@ -124,7 +126,7 @@ enum pcap_thread_queue_mode {
     0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
     0, 0, { 0, 0 }, 1, PCAP_NETMASK_UNKNOWN, \
     PCAP_THREAD_DEFAULT_QUEUE_SIZE, 0, 0, \
-    0, "", 0 \
+    0, "", 0, 0, { 0, 0 } \
 }
 
 struct pcap_thread {
@@ -164,6 +166,9 @@ struct pcap_thread {
     int                     status;
 	char                    errbuf[PCAP_ERRBUF_SIZE];
     pcap_thread_pcaplist_t* pcaplist;
+    pcap_thread_pcaplist_t* step;
+
+    struct timeval          timedrun;
 };
 
 #ifdef HAVE_PTHREAD
@@ -184,9 +189,9 @@ struct pcap_thread_pcaplist {
     char*                   name;
     pcap_t*                 pcap;
     void*                   user;
+    int                     running;
 #ifdef HAVE_PTHREAD
     pthread_t               thread;
-    int                     running;
     pthread_cond_t*         queue_cond;
     pthread_mutex_t*        queue_mutex;
     size_t                  queue_size;
@@ -240,6 +245,8 @@ int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter_optimize);
 bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask);
+struct timeval pcap_thread_timedrun(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun);
 
 size_t pcap_thread_queue_size(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_size);
@@ -253,6 +260,8 @@ int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, 
 int pcap_thread_close(pcap_thread_t* pcap_thread);
 
 int pcap_thread_run(pcap_thread_t* pcap_thread);
+int pcap_thread_next(pcap_thread_t* pcap_thread);
+int pcap_thread_next_reset(pcap_thread_t* pcap_thread);
 int pcap_thread_stop(pcap_thread_t* pcap_thread);
 
 int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t callback, u_char* user);
