@@ -261,6 +261,7 @@ int pcap_thread_close(pcap_thread_t* pcap_thread);
 
 int pcap_thread_run(pcap_thread_t* pcap_thread);
 int pcap_thread_next(pcap_thread_t* pcap_thread);
+int pcap_thread_next_reset(pcap_thread_t* pcap_thread);
 int pcap_thread_stop(pcap_thread_t* pcap_thread);
 
 int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t callback, u_char* user);
