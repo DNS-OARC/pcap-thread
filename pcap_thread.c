@@ -1154,6 +1154,19 @@ int pcap_thread_next(pcap_thread_t* pcap_thread) {
     return PCAP_THREAD_OK;
 }
 
+int pcap_thread_next_reset(pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (!pcap_thread->pcaplist) {
+        return PCAP_THREAD_NOPCAPS;
+    }
+
+    pcap_thread->step = 0;
+
+    return PCAP_THREAD_OK;
+}
+
 int pcap_thread_stop(pcap_thread_t* pcap_thread) {
     pcap_thread_pcaplist_t* pcaplist;
 
