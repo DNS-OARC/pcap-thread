@@ -1,3 +1,9 @@
+2016-08-26 Jerry Lundström
+
+    Release 1.1.1
+
+    0a06702 Fix Coverity CID 143102 (#1 of 1): Buffer not null terminated
+
 2016-08-25 Jerry Lundström
 
     Release 1.1.0
