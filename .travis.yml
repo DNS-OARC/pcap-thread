@@ -1,19 +1,20 @@
+env:
+  global:
+   - secure: "be4QG7pCH6LQmjHOyfu1mA9P8tNimo1KedmuqMU5pXQ60NU4vmcnqaztlcgGLXsTo8f+bL3A2er82vEspXRtT23p4REshvPk516uNNYUV8KC//yuppWAVoPyhywa7BlNtB/7dy8jyluPZb0D4pWmhiCm/zv0gldEZEAJBHgJGIy/XXBtGIcHjWCDEBuZILuchPWFVwag1fzSKex/oLSOK5wpv4xqLHIMv364Ey2kiZtTWYjR16y0wDR+YBkMn/u6kxV7fMHxyOHQFQmIoXC3ort5sKh4bVL8UaMpZcJMBPsDuOxwvtCCkskUOU4ZFJtGK1/T31W0AnIwyvRorMG9KazGZUkHIOJG5A9lpyBjv7uzf8VE7hdaj/ohsY8eX18TpxDnznE0ZjL5u8fHy740Hkk7nOvpUDyOk/3tTpOE6FuHw1NHkURpNJIaxNk6IZoTs2TM774V0u9KZK3iTeb+DTS3HDJGexJVBzvxxsGIdKLXlWaPZTQfk1bxY+d61hlcbpdqHK2De4UKI8EwryaONkCSwq+eisrVfZsZ2JFcDigmGk9aLiW2u6HJpHEvOGWOoMhMTC26LxIO5M3+lQRdBIx9hvleyWo9j5pUUNpMWVie/W0MPWbZX6Vj7u7R+pwJcLWpw+AKUnkzH7oa+LL2dW1ULg5Jty4hQdRCV56ixYA="
 addons:
   apt:
     update: true
     packages:
     - libpcap-dev
+  coverity_scan:
+    project:
+      name: "DNS-OARC/pcap-thread"
+      description: "Build submitted via Travis CI"
+    notification_email: lundstrom.jerry@gmail.com
+    build_command_prepend: "(cd hexdump && ./autogen.sh && ./configure && make clean)"
+    build_command: "./cov.sh"
+    branch_pattern: coverity_scan
 language: c
 compiler:
-  - clang
   - gcc
-script:
-  - cd hexdump
-  - sh autogen.sh
-  - mkdir build
-  - cd build
-  - ../configure --enable-warn-all
-  - make
-  - ( cd test && make cobadpkts ) || true
-  - make test
-  - ./hexdump -h
+script: true
