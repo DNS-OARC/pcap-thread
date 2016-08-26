@@ -1222,7 +1222,7 @@ int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t c
 
     for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
         if ((pcap_thread->status = pcap_stats(pcaplist->pcap, &stats))) {
-            strncpy(pcap_thread->errbuf, pcap_geterr(pcaplist->pcap), sizeof(pcap_thread->errbuf));
+            strncpy(pcap_thread->errbuf, pcap_geterr(pcaplist->pcap), sizeof(pcap_thread->errbuf) - 1);
             return PCAP_THREAD_EPCAP;
         }
         callback(user, &stats, pcaplist->name, pcap_datalink(pcaplist->pcap));
