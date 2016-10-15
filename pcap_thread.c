@@ -1045,6 +1045,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 }
             }
         }
+
+        pcap_thread_stop(pcap_thread);
+
         if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
             pthread_mutex_unlock(&(pcap_thread->queue_mutex));
         }
