@@ -65,6 +65,8 @@ extern "C" {
 #define PCAP_THREAD_DEFAULT_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_WAIT
 #endif
 #endif
+#define PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_DROP
+#define PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT { 0, 10000 }
 
 #define PCAP_THREAD_OK              0
 #define PCAP_THREAD_EPCAP           1
@@ -101,7 +103,8 @@ typedef struct pcap_thread_pcaplist pcap_thread_pcaplist_t;
 enum pcap_thread_queue_mode {
     PCAP_THREAD_QUEUE_MODE_COND,
     PCAP_THREAD_QUEUE_MODE_WAIT,
-    PCAP_THREAD_QUEUE_MODE_YIELD
+    PCAP_THREAD_QUEUE_MODE_YIELD,
+    PCAP_THREAD_QUEUE_MODE_DROP
 };
 
 #ifdef HAVE_PCAP_DIRECTION_T
@@ -109,11 +112,13 @@ enum pcap_thread_queue_mode {
 #else
 #define PCAP_THREAD_T_INIT_DIRECTION_T
 #endif
+
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_T_INIT_QUEUE PTHREAD_COND_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, 0,
 #else
 #define PCAP_THREAD_T_INIT_QUEUE
 #endif
+
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 #define PCAP_THREAD_T_INIT_PRECISION PCAP_TSTAMP_PRECISION_MICRO
 #else
@@ -121,7 +126,7 @@ enum pcap_thread_queue_mode {
 #endif
 
 #define PCAP_THREAD_T_INIT { \
-    1, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_WAIT, PCAP_THREAD_T_INIT_QUEUE \
+    1, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_WAIT, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT, PCAP_THREAD_T_INIT_QUEUE \
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
     0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
     0, 0, { 0, 0 }, 1, PCAP_NETMASK_UNKNOWN, \
@@ -133,6 +138,8 @@ struct pcap_thread {
     int                         use_threads;
     pcap_thread_queue_mode_t    queue_mode;
     struct timeval              queue_wait;
+    pcap_thread_queue_mode_t    callback_queue_mode;
+    struct timeval              callback_queue_wait;
 #ifdef HAVE_PTHREAD
     pthread_cond_t              queue_cond;
     pthread_mutex_t             queue_mutex;
@@ -173,13 +180,13 @@ struct pcap_thread {
 
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
-    0, 0, 0, 0, \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, PTHREAD_COND_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT, 0, \
     0 \
 }
 #else
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
-    0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, \
     0 \
 }
 #endif
@@ -190,6 +197,7 @@ struct pcap_thread_pcaplist {
     pcap_t*                 pcap;
     void*                   user;
     int                     running;
+    int                     is_offline;
 #ifdef HAVE_PTHREAD
     pthread_t               thread;
     pthread_cond_t*         queue_cond;
@@ -202,6 +210,12 @@ struct pcap_thread_pcaplist {
     size_t                  write_pos;
     pcap_thread_callback_t  dropback;
     int                     snapshot;
+
+    pthread_cond_t              callback_queue_cond;
+    pthread_mutex_t             callback_queue_mutex;
+    pcap_thread_queue_mode_t    callback_queue_mode;
+    struct timeval              callback_queue_wait;
+    int                         callback_queue_full;
 #endif
     pcap_thread_callback_t  callback;
 };
@@ -220,6 +234,10 @@ pcap_thread_queue_mode_t pcap_thread_queue_mode(const pcap_thread_t* pcap_thread
 int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t queue_mode);
 struct timeval pcap_thread_queue_wait(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_queue_wait(pcap_thread_t* pcap_thread, const struct timeval queue_wait);
+pcap_thread_queue_mode_t pcap_thread_callback_queue_mode(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_callback_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t callback_queue_mode);
+struct timeval pcap_thread_callback_queue_wait(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_callback_queue_wait(pcap_thread_t* pcap_thread, const struct timeval callback_queue_wait);
 int pcap_thread_snapshot(const pcap_thread_t* pcap_thread);
 int pcap_thread_snaplen(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_snaplen(pcap_thread_t* pcap_thread, const int snaplen);

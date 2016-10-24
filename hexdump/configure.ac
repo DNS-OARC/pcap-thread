@@ -40,7 +40,15 @@ AC_CONFIG_HEADER([config.h])
 AC_PROG_CC
 AM_PROG_CC_C_O
 
-AX_PCAP_THREAD
+AC_ARG_ENABLE([pthread],
+    [AS_HELP_STRING([--disable-pthread],
+        [disable the use of pthread])],
+    [],
+    [enable_pthread=yes])
+
+AS_IF([test "x$enable_pthread" != xno],
+    [AX_PCAP_THREAD],
+    [AX_PCAP_THREAD_PCAP])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
