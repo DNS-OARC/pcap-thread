@@ -1070,19 +1070,31 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             pcaplist->running = 1;
 
             if (!(pcaplist->queue = calloc(pcaplist->queue_size, sizeof(char)))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
             if (!(pcaplist->pkthdr = calloc(pcaplist->queue_size, sizeof(struct pcap_pkthdr)))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
             if (!(pcaplist->pkt = calloc(pcaplist->queue_size, pcap_thread->snapshot))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
 
             if ((err = pthread_create(&(pcaplist->thread), 0, _thread, (void*)pcaplist))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 errno = err;
                 return PCAP_THREAD_ERRNO;
@@ -1094,6 +1106,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 case PCAP_THREAD_QUEUE_MODE_COND:
                     if (timedrun) {
                         if ((err = pthread_cond_timedwait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex), &end)) && err != ETIMEDOUT) {
+                            if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                                pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                            }
                             pcap_thread_stop(pcap_thread);
                             errno = err;
                             return PCAP_THREAD_ERRNO;
@@ -1101,6 +1116,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                         break;
                     }
                     if ((err = pthread_cond_wait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex)))) {
+                        if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                            pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                        }
                         pcap_thread_stop(pcap_thread);
                         errno = err;
                         return PCAP_THREAD_ERRNO;
@@ -1162,6 +1180,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 struct timeval now;
 
                 if (gettimeofday(&now, 0)) {
+                    if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                        pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                    }
                     pcap_thread_stop(pcap_thread);
                     return PCAP_THREAD_ERRNO;
                 }
@@ -1177,7 +1198,6 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
             pthread_mutex_unlock(&(pcap_thread->queue_mutex));
         }
-
         pcap_thread_stop(pcap_thread);
     }
     else
