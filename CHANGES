@@ -1,3 +1,32 @@
+2016-10-26 Jerry Lundström
+
+    Release 1.2.0
+
+    Implement callback queue mode which can be used to wait for space in
+    the queue when it is full to not drop packets. A new queue mode
+    PCAP_THREAD_QUEUE_MODE_DROP is the default for callback queues and
+    will just drop packets if the queue is full, this was the old behavior.
+
+    If all of the pcaps are offline and the callback queue mode is to drop
+    packets then it will be changed to use pthread conditions, otherwise
+    there is a risk that packets will be dropped if reading packets is
+    faster then processing them.
+
+    Other changes:
+    - Fix a deadlock issue that could happen when having multiple pcaps
+      and using threads with cond mode
+    - Fix handling of offline pcaps, they can not be put into nonblocking
+      mode
+    - Fix uninitialization warnings
+
+    New option in `hexdump`:
+    - `-C <mode>`: callback queue mode: cond, drop, wait or yield
+
+    Commits:
+
+    c7eabec Fix CID 1371137
+    87cadfc Deadlock fix, handling of offline pcaps and callback queue mode
+
 2016-10-15 Jerry Lundström
 
     Release 1.1.2
