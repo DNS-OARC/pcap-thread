@@ -70,6 +70,7 @@ pcap_thread_t* pcap_thread_create(void) {
     pcap_thread_t* pcap_thread = calloc(1, sizeof(pcap_thread_t));
     if (pcap_thread) {
         static struct timeval queue_wait = PCAP_THREAD_DEFAULT_QUEUE_WAIT;
+        static struct timeval callback_queue_wait = PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT;
 
 #ifdef HAVE_PTHREAD
         pcap_thread->queue_mode = PCAP_THREAD_QUEUE_MODE_COND;
@@ -94,7 +95,9 @@ pcap_thread_t* pcap_thread_create(void) {
         pcap_thread->queue_mode = PCAP_THREAD_QUEUE_MODE_WAIT;
 #endif
 #endif
+        pcap_thread->callback_queue_mode = PCAP_THREAD_QUEUE_MODE_DROP;
         pcap_thread->queue_wait = queue_wait;
+        pcap_thread->callback_queue_wait = callback_queue_wait;
         pcap_thread->timeout = PCAP_THREAD_DEFAULT_TIMEOUT;
         pcap_thread->queue_size = PCAP_THREAD_DEFAULT_QUEUE_SIZE;
         pcap_thread->filter_optimize = 1;
@@ -147,21 +150,17 @@ int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_que
         return PCAP_THREAD_EINVAL;
     }
 
-#ifdef HAVE_PTHREAD
     switch (queue_mode) {
-        case PCAP_THREAD_QUEUE_MODE_COND:
-        case PCAP_THREAD_QUEUE_MODE_WAIT:
-            break;
         case PCAP_THREAD_QUEUE_MODE_YIELD:
 #ifndef HAVE_SCHED_YIELD
             return PCAP_THREAD_NOYIELD;
-#else
-            break;
 #endif
+        case PCAP_THREAD_QUEUE_MODE_COND:
+        case PCAP_THREAD_QUEUE_MODE_WAIT:
+            break;
         default:
             return PCAP_THREAD_EINVAL;
     }
-#endif
 
     pcap_thread->queue_mode = queue_mode;
 
@@ -183,6 +182,56 @@ int pcap_thread_set_queue_wait(pcap_thread_t* pcap_thread, const struct timeval 
     }
 
     pcap_thread->queue_wait = queue_wait;
+
+    return PCAP_THREAD_OK;
+}
+
+pcap_thread_queue_mode_t pcap_thread_callback_queue_mode(const pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->callback_queue_mode;
+}
+
+int pcap_thread_set_callback_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t callback_queue_mode) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+
+    switch (callback_queue_mode) {
+        case PCAP_THREAD_QUEUE_MODE_YIELD:
+#ifndef HAVE_SCHED_YIELD
+            return PCAP_THREAD_NOYIELD;
+#endif
+        case PCAP_THREAD_QUEUE_MODE_COND:
+        case PCAP_THREAD_QUEUE_MODE_WAIT:
+        case PCAP_THREAD_QUEUE_MODE_DROP:
+            break;
+        default:
+            return PCAP_THREAD_EINVAL;
+    }
+
+    pcap_thread->callback_queue_mode = callback_queue_mode;
+
+    return PCAP_THREAD_OK;
+}
+
+struct timeval pcap_thread_callback_queue_wait(const pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        static struct timeval t = { 0, 0 };
+        return t;
+    }
+
+    return pcap_thread->callback_queue_wait;
+}
+
+int pcap_thread_set_callback_queue_wait(pcap_thread_t* pcap_thread, const struct timeval callback_queue_wait) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+
+    pcap_thread->callback_queue_wait = callback_queue_wait;
 
     return PCAP_THREAD_OK;
 }
@@ -666,6 +715,7 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
         return PCAP_THREAD_ENOMEM;
     }
     memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+    pcaplist->is_offline = 1;
     if (!(pcaplist->name = strdup(file))) {
         free(pcaplist);
         return PCAP_THREAD_ENOMEM;
@@ -712,6 +762,7 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
 int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, void* user) {
     pcap_thread_pcaplist_t* pcaplist;
     int nonblock;
+    int is_offline = 0;
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -725,18 +776,24 @@ int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, 
     }
     pcap_thread->status = 0;
 
-    nonblock = pcap_getnonblock(pcap, pcap_thread->errbuf);
-    if (nonblock < 0) {
-        return PCAP_THREAD_EPCAP;
+    if (pcap_file(pcap)) {
+        is_offline = 1;
     }
-    if (nonblock > 0) {
-        return PCAP_THREAD_EWOULDBLOCK;
+    else {
+        nonblock = pcap_getnonblock(pcap, pcap_thread->errbuf);
+        if (nonblock < 0) {
+            return PCAP_THREAD_EPCAP;
+        }
+        if (nonblock > 0) {
+            return PCAP_THREAD_EWOULDBLOCK;
+        }
     }
 
     if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
         return PCAP_THREAD_ENOMEM;
     }
     memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+    pcaplist->is_offline = is_offline;
     if (!(pcaplist->name = strdup(name))) {
         free(pcaplist);
         return PCAP_THREAD_ENOMEM;
@@ -803,19 +860,54 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
 #ifdef HAVE_PTHREAD
 static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt) {
     pcap_thread_pcaplist_t* pcaplist;
+    int check_again = 1;
+    struct timeval t;
 
     if (!user) {
         return;
     }
     pcaplist = (pcap_thread_pcaplist_t*)user;
 
-    if (pcaplist->queue[pcaplist->write_pos]
-        || pkthdr->caplen > pcaplist->snapshot)
-    {
+    if (pkthdr->caplen > pcaplist->snapshot) {
         if (pcaplist->dropback) {
             pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
         }
         return;
+    }
+
+    while (check_again) {
+        if (!pcaplist->queue[pcaplist->write_pos]) {
+            break;
+        }
+
+        switch (pcaplist->callback_queue_mode) {
+            case PCAP_THREAD_QUEUE_MODE_COND:
+                pcaplist->callback_queue_full = 1;
+                if (pthread_cond_wait(&(pcaplist->callback_queue_cond), &(pcaplist->callback_queue_mutex))) {
+                    if (pcaplist->dropback) {
+                        pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+                    }
+                    return;
+                }
+                break;
+
+            case PCAP_THREAD_QUEUE_MODE_DROP:
+                if (pcaplist->dropback) {
+                    pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+                }
+                return;
+
+            case PCAP_THREAD_QUEUE_MODE_WAIT:
+                t = pcaplist->callback_queue_wait;
+                select(1, NULL, NULL, NULL, &t);
+                break;
+
+#ifdef HAVE_SCHED_YIELD
+            case PCAP_THREAD_QUEUE_MODE_YIELD:
+                sched_yield();
+                break;
+#endif
+        }
     }
 
     memcpy(&(pcaplist->pkthdr[pcaplist->write_pos]), pkthdr, sizeof(struct pcap_pkthdr));
@@ -841,17 +933,28 @@ static void* _thread(void* vp) {
     }
     pcaplist = (pcap_thread_pcaplist_t*)vp;
 
+    if (pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+        pthread_mutex_lock(&(pcaplist->callback_queue_mutex));
+    }
+
     ret = pcap_loop(pcaplist->pcap, -1, _callback, (u_char*)pcaplist);
     if (ret == -1) {
     }
     if (ret == -2) {
     }
 
-    pcaplist->running = 0;
+    if (pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+        pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
+    }
+
     if (pcaplist->queue_cond && pcaplist->queue_mutex) {
         pthread_mutex_lock(pcaplist->queue_mutex);
+        pcaplist->running = 0;
         pthread_cond_signal(pcaplist->queue_cond);
         pthread_mutex_unlock(pcaplist->queue_mutex);
+    }
+    else {
+        pcaplist->running = 0;
     }
 
     return 0;
@@ -873,7 +976,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
     pcap_thread_pcaplist_t* pcaplist;
     int run = 1, timedrun = 0;
     struct timeval start = { 0, 0 };
-    struct timespec end;
+    struct timespec end = { 0, 0 };
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -903,7 +1006,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
 
 #ifdef HAVE_PTHREAD
     if (pcap_thread->use_threads) {
-        int err;
+        int err, all_offline;
         struct timeval t;
 
         switch (pcap_thread->queue_mode) {
@@ -915,8 +1018,8 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 break;
             case PCAP_THREAD_QUEUE_MODE_WAIT:
                 break;
-            case PCAP_THREAD_QUEUE_MODE_YIELD:
 #ifdef HAVE_SCHED_YIELD
+            case PCAP_THREAD_QUEUE_MODE_YIELD:
                 break;
 #endif
             default:
@@ -924,6 +1027,12 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         }
 
         pcap_thread->queue_run = 1;
+        all_offline = 1;
+        for (pcaplist = pcap_thread->pcaplist; all_offline && pcaplist; pcaplist = pcaplist->next) {
+            if (!pcaplist->is_offline) {
+                all_offline = 0;
+            }
+        }
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
             if (pcaplist->queue) {
                 free(pcaplist->queue);
@@ -950,22 +1059,42 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 pcaplist->queue_cond = 0;
                 pcaplist->queue_mutex = 0;
             }
+            if (all_offline && pcap_thread->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_DROP) {
+                pcaplist->callback_queue_mode = PCAP_THREAD_QUEUE_MODE_COND;
+            }
+            else {
+                pcaplist->callback_queue_mode = pcap_thread->callback_queue_mode;
+            }
+            pcaplist->callback_queue_wait = pcap_thread->callback_queue_wait;
+            pcaplist->callback_queue_full = 0;
             pcaplist->running = 1;
 
             if (!(pcaplist->queue = calloc(pcaplist->queue_size, sizeof(char)))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
             if (!(pcaplist->pkthdr = calloc(pcaplist->queue_size, sizeof(struct pcap_pkthdr)))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
             if (!(pcaplist->pkt = calloc(pcaplist->queue_size, pcap_thread->snapshot))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 return PCAP_THREAD_ENOMEM;
             }
 
             if ((err = pthread_create(&(pcaplist->thread), 0, _thread, (void*)pcaplist))) {
+                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                }
                 pcap_thread_stop(pcap_thread);
                 errno = err;
                 return PCAP_THREAD_ERRNO;
@@ -977,6 +1106,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 case PCAP_THREAD_QUEUE_MODE_COND:
                     if (timedrun) {
                         if ((err = pthread_cond_timedwait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex), &end)) && err != ETIMEDOUT) {
+                            if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                                pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                            }
                             pcap_thread_stop(pcap_thread);
                             errno = err;
                             return PCAP_THREAD_ERRNO;
@@ -984,6 +1116,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                         break;
                     }
                     if ((err = pthread_cond_wait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex)))) {
+                        if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                            pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                        }
                         pcap_thread_stop(pcap_thread);
                         errno = err;
                         return PCAP_THREAD_ERRNO;
@@ -1000,10 +1135,14 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     sched_yield();
                     break;
 #endif
+                default:
+                    break;
             }
 
             run = 0;
             for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+                int read = 0;
+
                 if (!pcaplist->running) {
                     if (pcaplist->thread) {
                         pthread_join(pcaplist->thread, 0);
@@ -1027,6 +1166,13 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     if (pcaplist->read_pos == pcaplist->queue_size) {
                         pcaplist->read_pos = 0;
                     }
+                    read++;
+                }
+                if (read && pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND && pcaplist->callback_queue_full) {
+                    pthread_mutex_lock(&(pcaplist->callback_queue_mutex));
+                    pcaplist->callback_queue_full = 0;
+                    pthread_cond_signal(&(pcaplist->callback_queue_cond));
+                    pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
                 }
             }
 
@@ -1034,6 +1180,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 struct timeval now;
 
                 if (gettimeofday(&now, 0)) {
+                    if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+                        pthread_mutex_unlock(&(pcap_thread->queue_mutex));
+                    }
                     pcap_thread_stop(pcap_thread);
                     return PCAP_THREAD_ERRNO;
                 }
@@ -1046,11 +1195,10 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             }
         }
 
-        pcap_thread_stop(pcap_thread);
-
         if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
             pthread_mutex_unlock(&(pcap_thread->queue_mutex));
         }
+        pcap_thread_stop(pcap_thread);
     }
     else
 #endif
@@ -1067,7 +1215,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             if (fd > max_fd)
                 max_fd = fd;
 
-            if ((pcap_thread->status = pcap_setnonblock(pcaplist->pcap, 1, pcap_thread->errbuf))) {
+            if (!pcaplist->is_offline && (pcap_thread->status = pcap_setnonblock(pcaplist->pcap, 1, pcap_thread->errbuf))) {
                 return PCAP_THREAD_EPCAP;
             }
             pcaplist->callback = pcap_thread->callback;
@@ -1100,7 +1248,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     pcap_thread->status = -1;
                     return PCAP_THREAD_EPCAP;
                 }
-                else if (packets == -2) {
+                else if (packets == -2 || (pcaplist->is_offline && !packets)) {
                     pcaplist->running = 0;
                 }
             }

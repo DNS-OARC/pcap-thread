@@ -102,6 +102,7 @@ void stat_callback(u_char* user, const struct pcap_stat* stats, const char* name
 }
 
 pcap_thread_t pt = PCAP_THREAD_T_INIT;
+pcap_thread_pcaplist_t __pcaplist_not_used = PCAP_THREAD_PCAPLIST_T_INIT;
 
 void stop(int signum) {
     pcap_thread_stop(&pt);
@@ -145,7 +146,7 @@ int main(int argc, char** argv) {
         exit(4);
     }
 
-    while ((opt = getopt(argc, argv, "T:M:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hDVA:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hDVA:c:")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -157,6 +158,18 @@ int main(int argc, char** argv) {
                 ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_WAIT);
             else if (!strcmp("yield", optarg))
                 ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_YIELD);
+            else
+                err = -1;
+            break;
+        case 'C':
+            if (!strcmp("cond", optarg))
+                ret = pcap_thread_set_callback_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_COND);
+            else if (!strcmp("drop", optarg))
+                ret = pcap_thread_set_callback_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_DROP);
+            else if (!strcmp("wait", optarg))
+                ret = pcap_thread_set_callback_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_WAIT);
+            else if (!strcmp("yield", optarg))
+                ret = pcap_thread_set_callback_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_YIELD);
             else
                 err = -1;
             break;
@@ -278,6 +291,7 @@ int main(int argc, char** argv) {
 " -c <count>         process count packets then exit\n"
 " -T <0|1>           use/not use threads\n"
 " -M <mode>          queue mode: cond, wait or yield\n"
+" -C <mode>          callback queue mode: cond, drop, wait or yield\n"
 " -s <len>           snap length\n"
 " -p <0|1>           use/not use promiscuous mode\n"
 " -m <0|1>           use/not use monitor mode\n"
