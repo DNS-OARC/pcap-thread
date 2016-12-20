@@ -875,7 +875,9 @@ static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_ch
         return;
     }
 
-    while (check_again) {
+    while (pcaplist->running && check_again) {
+        pthread_testcancel();
+
         if (!pcaplist->queue[pcaplist->write_pos]) {
             break;
         }
@@ -918,15 +920,31 @@ static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_ch
         pcaplist->write_pos = 0;
     }
     if (pcaplist->queue_cond && pcaplist->queue_mutex) {
-        pthread_mutex_lock(pcaplist->queue_mutex);
-        pthread_cond_signal(pcaplist->queue_cond);
-        pthread_mutex_unlock(pcaplist->queue_mutex);
+        if (!pthread_mutex_lock(pcaplist->queue_mutex)) {
+            pthread_cond_signal(pcaplist->queue_cond);
+            pthread_mutex_unlock(pcaplist->queue_mutex);
+        }
+    }
+}
+
+static void _cleanup(void* vp) {
+    pcap_thread_pcaplist_t* pcaplist;
+
+    if (!vp) {
+        return;
+    }
+    pcaplist = (pcap_thread_pcaplist_t*)vp;
+
+    if (pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+        pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
     }
 }
 
 static void* _thread(void* vp) {
     pcap_thread_pcaplist_t* pcaplist;
-    int ret;
+    int ret = 0;
+
+    pthread_detach(pthread_self());
 
     if (!vp) {
         return 0;
@@ -937,24 +955,32 @@ static void* _thread(void* vp) {
         pthread_mutex_lock(&(pcaplist->callback_queue_mutex));
     }
 
-    ret = pcap_loop(pcaplist->pcap, -1, _callback, (u_char*)pcaplist);
-    if (ret == -1) {
+    pthread_cleanup_push(_cleanup, vp);
+
+    /*
+     * pcap_loop() might return -2 to indicate pcap_breakloop() was called
+     * but we do not need to act on that because either this thread has
+     * been cancelled or running has been cleared
+     */
+    while (pcaplist->running && ret != -1) {
+        pthread_testcancel();
+        ret = pcap_loop(pcaplist->pcap, -1, _callback, (u_char*)pcaplist);
     }
-    if (ret == -2) {
-    }
+    /* TODO: Store pcap_loop() error */
+
+    pthread_cleanup_pop(0);
 
     if (pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
         pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
     }
 
+    pcaplist->running = 0;
+
     if (pcaplist->queue_cond && pcaplist->queue_mutex) {
-        pthread_mutex_lock(pcaplist->queue_mutex);
-        pcaplist->running = 0;
-        pthread_cond_signal(pcaplist->queue_cond);
-        pthread_mutex_unlock(pcaplist->queue_mutex);
-    }
-    else {
-        pcaplist->running = 0;
+        if (!pthread_mutex_lock(pcaplist->queue_mutex)) {
+            pthread_cond_signal(pcaplist->queue_cond);
+            pthread_mutex_unlock(pcaplist->queue_mutex);
+        }
     }
 
     return 0;
@@ -996,6 +1022,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
     if (pcap_thread->timedrun.tv_sec || pcap_thread->timedrun.tv_usec) {
         timedrun = 1;
         if (gettimeofday(&start, 0)) {
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "gettimeofday()");
             return PCAP_THREAD_ERRNO;
         }
 
@@ -1013,6 +1040,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             case PCAP_THREAD_QUEUE_MODE_COND:
                 if ((err = pthread_mutex_lock(&(pcap_thread->queue_mutex)))) {
                     errno = err;
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_mutex_lock()");
                     return PCAP_THREAD_ERRNO;
                 }
                 break;
@@ -1026,13 +1054,16 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 return PCAP_THREAD_EINVAL;
         }
 
-        pcap_thread->queue_run = 1;
         all_offline = 1;
         for (pcaplist = pcap_thread->pcaplist; all_offline && pcaplist; pcaplist = pcaplist->next) {
             if (!pcaplist->is_offline) {
                 all_offline = 0;
+                break;
             }
         }
+
+        pcap_thread->queue_run = 1;
+        err = PCAP_THREAD_OK;
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
             if (pcaplist->queue) {
                 free(pcaplist->queue);
@@ -1070,58 +1101,45 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             pcaplist->running = 1;
 
             if (!(pcaplist->queue = calloc(pcaplist->queue_size, sizeof(char)))) {
-                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-                }
-                pcap_thread_stop(pcap_thread);
-                return PCAP_THREAD_ENOMEM;
+                err = PCAP_THREAD_ENOMEM;
+                break;
             }
             if (!(pcaplist->pkthdr = calloc(pcaplist->queue_size, sizeof(struct pcap_pkthdr)))) {
-                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-                }
-                pcap_thread_stop(pcap_thread);
-                return PCAP_THREAD_ENOMEM;
+                err = PCAP_THREAD_ENOMEM;
+                break;
             }
             if (!(pcaplist->pkt = calloc(pcaplist->queue_size, pcap_thread->snapshot))) {
-                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-                }
-                pcap_thread_stop(pcap_thread);
-                return PCAP_THREAD_ENOMEM;
+                err = PCAP_THREAD_ENOMEM;
+                break;
             }
 
             if ((err = pthread_create(&(pcaplist->thread), 0, _thread, (void*)pcaplist))) {
-                if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                    pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-                }
-                pcap_thread_stop(pcap_thread);
                 errno = err;
-                return PCAP_THREAD_ERRNO;
+                err = PCAP_THREAD_ERRNO;
+                PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_create()");
+                break;
             }
         }
 
-        while (run && pcap_thread->queue_run) {
+        while (!err && run && pcap_thread->queue_run) {
             switch (pcap_thread->queue_mode) {
                 case PCAP_THREAD_QUEUE_MODE_COND:
                     if (timedrun) {
-                        if ((err = pthread_cond_timedwait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex), &end)) && err != ETIMEDOUT) {
-                            if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                                pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-                            }
-                            pcap_thread_stop(pcap_thread);
+                        err = pthread_cond_timedwait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex), &end);
+                        if (err == ETIMEDOUT) {
+                            err = PCAP_THREAD_OK;
+                        }
+                        else if (err) {
                             errno = err;
-                            return PCAP_THREAD_ERRNO;
+                            err = PCAP_THREAD_ERRNO;
+                            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_timedwait()");
                         }
                         break;
                     }
                     if ((err = pthread_cond_wait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex)))) {
-                        if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                            pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-                        }
-                        pcap_thread_stop(pcap_thread);
                         errno = err;
-                        return PCAP_THREAD_ERRNO;
+                        err = PCAP_THREAD_ERRNO;
+                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_wait()");
                     }
                     break;
 
@@ -1139,17 +1157,14 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     break;
             }
 
+            if (err != PCAP_THREAD_OK)
+                break;
+
             run = 0;
             for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
                 int read = 0;
 
-                if (!pcaplist->running) {
-                    if (pcaplist->thread) {
-                        pthread_join(pcaplist->thread, 0);
-                        pcaplist->thread = 0;
-                    }
-                }
-                else {
+                if (pcaplist->running) {
                     run = 1;
                 }
                 while (pcaplist->queue[pcaplist->read_pos]) {
@@ -1169,22 +1184,42 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     read++;
                 }
                 if (read && pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND && pcaplist->callback_queue_full) {
-                    pthread_mutex_lock(&(pcaplist->callback_queue_mutex));
+                    /*
+                     * TODO: Unsure if these errors should break the loop, maybe set thread to not running and kill it
+                     */
+                    if ((err = pthread_mutex_lock(&(pcaplist->callback_queue_mutex)))) {
+                        errno = err;
+                        err = PCAP_THREAD_ERRNO;
+                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_mutex_lock(callback_queue)");
+                        break;
+                    }
                     pcaplist->callback_queue_full = 0;
-                    pthread_cond_signal(&(pcaplist->callback_queue_cond));
-                    pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
+                    if ((err = pthread_cond_signal(&(pcaplist->callback_queue_cond)))) {
+                        errno = err;
+                        err = PCAP_THREAD_ERRNO;
+                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_signal(callback_queue)");
+                        pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
+                        break;
+                    }
+                    if ((err = pthread_mutex_unlock(&(pcaplist->callback_queue_mutex)))) {
+                        errno = err;
+                        err = PCAP_THREAD_ERRNO;
+                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_mutex_unlock(callback_queue)");
+                        break;
+                    }
                 }
             }
+
+            if (err != PCAP_THREAD_OK)
+                break;
 
             if (run && timedrun) {
                 struct timeval now;
 
                 if (gettimeofday(&now, 0)) {
-                    if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                        pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-                    }
-                    pcap_thread_stop(pcap_thread);
-                    return PCAP_THREAD_ERRNO;
+                    err = PCAP_THREAD_ERRNO;
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "gettimeofday()");
+                    break;
                 }
 
                 if (now.tv_sec > end.tv_sec
@@ -1195,10 +1230,24 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             }
         }
 
+        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+            pcaplist->running = 0;
+        }
+
+        pcap_thread->queue_run = 0;
         if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
             pthread_mutex_unlock(&(pcap_thread->queue_mutex));
         }
-        pcap_thread_stop(pcap_thread);
+
+        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+            if (pcaplist->thread) {
+                pcap_breakloop(pcaplist->pcap);
+                pthread_cancel(pcaplist->thread);
+                pcaplist->thread = 0;
+            }
+        }
+
+        return err;
     }
     else
 #endif
@@ -1229,6 +1278,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             rfds = fds;
             t2 = t1;
             if (select(max_fd, &rfds, 0, 0, &t2) == -1) {
+                PCAP_THREAD_SET_ERRBUF(pcap_thread, "select()");
                 return PCAP_THREAD_ERRNO;
             }
 
@@ -1257,6 +1307,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 struct timeval now;
 
                 if (gettimeofday(&now, 0)) {
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "gettimeofday()");
                     return PCAP_THREAD_ERRNO;
                 }
 
@@ -1328,27 +1379,23 @@ int pcap_thread_stop(pcap_thread_t* pcap_thread) {
         return PCAP_THREAD_NOPCAPS;
     }
 
+    for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+        pcaplist->running = 0;
+        pcap_breakloop(pcaplist->pcap);
+    }
+
 #ifdef HAVE_PTHREAD
-    if (pcap_thread->use_threads) {
-        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
-            if (pcaplist->thread) {
-                pthread_cancel(pcaplist->thread);
-                pthread_join(pcaplist->thread, 0);
-                pcaplist->thread = 0;
-            }
-        }
-        pcap_thread->queue_run = 0;
-        if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-            pthread_cond_signal(&(pcap_thread->queue_cond));
-        }
+    pcap_thread->queue_run = 0;
+
+    if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
+        /*
+         * Lock the queue mutex but ignore return if it is already owned by this thread
+         */
+        pthread_mutex_lock(&(pcap_thread->queue_mutex));
+        pthread_cond_signal(&(pcap_thread->queue_cond));
+        pthread_mutex_unlock(&(pcap_thread->queue_mutex));
     }
-    else
 #endif
-    {
-        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
-            pcap_breakloop(pcaplist->pcap);
-        }
-    }
 
     return PCAP_THREAD_OK;
 }
