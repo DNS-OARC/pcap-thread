@@ -178,6 +178,8 @@ struct pcap_thread {
     struct timeval          timedrun;
 };
 
+#define PCAP_THREAD_SET_ERRBUF(x, y) strncpy(x->errbuf, y, sizeof(x->errbuf) - 1)
+
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
     0, 0, 0, 0, 0, 0, \
