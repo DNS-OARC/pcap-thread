@@ -48,10 +48,10 @@
 extern "C" {
 #endif
 
-#define PCAP_THREAD_VERSION_STR     "1.2.0"
+#define PCAP_THREAD_VERSION_STR     "1.2.1"
 #define PCAP_THREAD_VERSION_MAJOR   1
 #define PCAP_THREAD_VERSION_MINOR   2
-#define PCAP_THREAD_VERSION_PATCH   0
+#define PCAP_THREAD_VERSION_PATCH   1
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT     1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE  64
@@ -177,6 +177,8 @@ struct pcap_thread {
 
     struct timeval          timedrun;
 };
+
+#define PCAP_THREAD_SET_ERRBUF(x, y) strncpy(x->errbuf, y, sizeof(x->errbuf) - 1)
 
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT { \

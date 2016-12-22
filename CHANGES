@@ -1,3 +1,22 @@
+2016-12-22 Jerry Lundström
+
+    Release 1.2.1
+
+    03018bc More tweaks to thread handling, locking, stopping and errors.
+
+    A situation could occur, because `pcap_thread_stop()` was canceling
+    and joining threads, that if called from a PCAP thread would result
+    in a deadlock.
+
+    - `pcap_thread_stop()` can now be safely called from any thread
+    - PCAP threads are not handled within `pcap_thread_run()`
+    - Store related system call in `errbuf` for all `PCAP_THREAD_ERRNO`
+      errors, retrieve system call with `pcap_thread_errbuf()`
+    - Detach PCAP threads for easier clean up
+    - Use `pthread_cleanup_push()` to unlock mutex on cancellation
+    - Use `pcap_breakloop()` and `pthread_cancel()` to correctly
+      cancel processing
+
 2016-10-26 Jerry Lundström
 
     Release 1.2.0
