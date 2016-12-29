@@ -58,6 +58,12 @@ autoreconf ... --include=src/pcap-thread/m4
 AX_PCAP_THREAD
 ```
 
+### Top level Makefile.am
+
+```m4
+ACLOCAL_AMFLAGS = ... -I src/pcap-thread/m4
+```
+
 ### Makefile.am
 
 ```m4
