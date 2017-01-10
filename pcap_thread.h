@@ -1,6 +1,6 @@
 /*
  * Author Jerry Lundström <jerry@dns-oarc.net>
- * Copyright (c) 2016, OARC, Inc.
+ * Copyright (c) 2016-2017, OARC, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,10 +48,10 @@
 extern "C" {
 #endif
 
-#define PCAP_THREAD_VERSION_STR     "1.2.1"
+#define PCAP_THREAD_VERSION_STR     "1.2.2"
 #define PCAP_THREAD_VERSION_MAJOR   1
 #define PCAP_THREAD_VERSION_MINOR   2
-#define PCAP_THREAD_VERSION_PATCH   1
+#define PCAP_THREAD_VERSION_PATCH   2
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT     1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE  64

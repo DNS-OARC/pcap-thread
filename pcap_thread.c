@@ -1,6 +1,6 @@
 /*
  * Author Jerry Lundström <jerry@dns-oarc.net>
- * Copyright (c) 2016, OARC, Inc.
+ * Copyright (c) 2016-2017, OARC, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -962,11 +962,16 @@ static void* _thread(void* vp) {
      * but we do not need to act on that because either this thread has
      * been cancelled or running has been cleared
      */
-    while (pcaplist->running && ret != -1) {
+    while (pcaplist->running) {
         pthread_testcancel();
         ret = pcap_loop(pcaplist->pcap, -1, _callback, (u_char*)pcaplist);
+        if (ret == -1) {
+            /* TODO: Store pcap_loop() error */
+            break;
+        }
+        if (!ret)
+            break;
     }
-    /* TODO: Store pcap_loop() error */
 
     pthread_cleanup_pop(0);
 

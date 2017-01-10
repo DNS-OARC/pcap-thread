@@ -1,5 +1,5 @@
 # Author Jerry Lundström <jerry@dns-oarc.net>
-# Copyright (c) 2016, OARC, Inc.
+# Copyright (c) 2016-2017, OARC, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,8 +31,12 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+ACLOCAL_AMFLAGS = -I ../m4
+
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = pcap_thread.c pcap_thread.h
+
+SUBDIRS = test
 
 AM_CFLAGS = -Wall -I$(srcdir) $(PTHREAD_CFLAGS)
 
@@ -48,3 +52,5 @@ pcap_thread.c: $(top_srcdir)/../pcap_thread.c pcap_thread.h
 
 pcap_thread.h: $(top_srcdir)/../pcap_thread.h
 	cp "$(top_srcdir)/../pcap_thread.h" "$(srcdir)"
+
+test: check

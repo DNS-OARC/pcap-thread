@@ -1,5 +1,5 @@
 # Author Jerry Lundström <jerry@dns-oarc.net>
-# Copyright (c) 2016-2017, OARC, Inc.
+# Copyright (c) 2017, OARC, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,24 +31,13 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-AC_PREREQ(2.61)
-AC_INIT([hexdump], [1.1.0], [admin@dns-oarc.net], [hexdump], [https://github.com/DNS-OARC/pcap-thread/issues])
-AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
-AC_CONFIG_SRCDIR([hexdump.c])
-AC_CONFIG_HEADER([config.h])
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-AC_PROG_CC
-AM_PROG_CC_C_O
+CLEANFILES = test*.log test*.trs \
+    dns.out
 
-AC_ARG_ENABLE([pthread],
-    [AS_HELP_STRING([--disable-pthread],
-        [disable the use of pthread])],
-    [],
-    [enable_pthread=yes])
+TESTS = test1.sh
 
-AS_IF([test "x$enable_pthread" != xno],
-    [AX_PCAP_THREAD],
-    [AX_PCAP_THREAD_PCAP])
-
-AC_CONFIG_FILES([Makefile test/Makefile])
-AC_OUTPUT
+EXTRA_DIST = $(TESTS) \
+    dns.gold \
+    dns.pcap

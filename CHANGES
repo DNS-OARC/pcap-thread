@@ -1,3 +1,15 @@
+2017-01-10 Jerry Lundström
+
+    Release 1.2.2
+
+    Fix for reading pcap files, got stuck because `pcap_loop()` returned
+    zero and forgot to check for that.  Added test for reading a pcap and
+    checking against a gold output file.
+
+    1842682 Got stuck reading pcap files, add test
+    deb6d28 Use ACLOCAL_AMFLAGS in hexdump
+    e9f0d48 Add documentation ACLOCAL_AMFLAGS
+
 2016-12-22 Jerry Lundström
 
     Release 1.2.1
