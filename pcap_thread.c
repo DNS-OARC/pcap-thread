@@ -962,11 +962,16 @@ static void* _thread(void* vp) {
      * but we do not need to act on that because either this thread has
      * been cancelled or running has been cleared
      */
-    while (pcaplist->running && ret != -1) {
+    while (pcaplist->running) {
         pthread_testcancel();
         ret = pcap_loop(pcaplist->pcap, -1, _callback, (u_char*)pcaplist);
+        if (ret == -1) {
+            /* TODO: Store pcap_loop() error */
+            break;
+        }
+        if (!ret)
+            break;
     }
-    /* TODO: Store pcap_loop() error */
 
     pthread_cleanup_pop(0);
 

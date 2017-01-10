@@ -36,6 +36,8 @@ ACLOCAL_AMFLAGS = -I ../m4
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = pcap_thread.c pcap_thread.h
 
+SUBDIRS = test
+
 AM_CFLAGS = -Wall -I$(srcdir) $(PTHREAD_CFLAGS)
 
 bin_PROGRAMS    = hexdump
@@ -50,3 +52,5 @@ pcap_thread.c: $(top_srcdir)/../pcap_thread.c pcap_thread.h
 
 pcap_thread.h: $(top_srcdir)/../pcap_thread.h
 	cp "$(top_srcdir)/../pcap_thread.h" "$(srcdir)"
+
+test: check
