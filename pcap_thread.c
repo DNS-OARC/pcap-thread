@@ -67,40 +67,50 @@ int pcap_thread_version_patch(void) {
  */
 
 pcap_thread_t* pcap_thread_create(void) {
+    static pcap_thread_t defaults = PCAP_THREAD_T_INIT;
     pcap_thread_t* pcap_thread = calloc(1, sizeof(pcap_thread_t));
     if (pcap_thread) {
-        static struct timeval queue_wait = PCAP_THREAD_DEFAULT_QUEUE_WAIT;
-        static struct timeval callback_queue_wait = PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT;
-
+        pcap_thread->use_threads = defaults.use_threads;
+        pcap_thread->queue_mode = defaults.queue_mode;
+        pcap_thread->queue_wait = defaults.queue_wait;
+        pcap_thread->callback_queue_mode = defaults.callback_queue_mode;
+        pcap_thread->callback_queue_wait = defaults.callback_queue_wait;
 #ifdef HAVE_PTHREAD
-        pcap_thread->queue_mode = PCAP_THREAD_QUEUE_MODE_COND;
-        {
-            int ret;
+        pcap_thread->queue_cond = defaults.queue_cond;
+        pcap_thread->queue_mutex = defaults.queue_mutex;
+        pcap_thread->queue_run = defaults.queue_run;
+#endif
 
-            if ((ret = pthread_cond_init(&(pcap_thread->queue_cond), 0))) {
-                errno = ret;
-                free(pcap_thread);
-                return 0;
-            }
-            if ((ret = pthread_mutex_init(&(pcap_thread->queue_mutex), 0))) {
-                errno = ret;
-                free(pcap_thread);
-                return 0;
-            }
-        }
-#else
-#ifdef HAVE_SCHED_YIELD
-        pcap_thread->queue_mode = PCAP_THREAD_QUEUE_MODE_YIELD;
-#else
-        pcap_thread->queue_mode = PCAP_THREAD_QUEUE_MODE_WAIT;
+        pcap_thread->snapshot = defaults.snapshot;
+        pcap_thread->snaplen = defaults.snaplen;
+        pcap_thread->promiscuous = defaults.promiscuous;
+        pcap_thread->monitor = defaults.monitor;
+        pcap_thread->timeout = defaults.timeout;
+
+        pcap_thread->buffer_size = defaults.buffer_size;
+        pcap_thread->timestamp_type = defaults.timestamp_type;
+        pcap_thread->timestamp_precision = defaults.timestamp_precision;
+        pcap_thread->immediate_mode = defaults.immediate_mode;
+#ifdef HAVE_PCAP_DIRECTION_T
+        pcap_thread->direction = defaults.direction;
 #endif
-#endif
-        pcap_thread->callback_queue_mode = PCAP_THREAD_QUEUE_MODE_DROP;
-        pcap_thread->queue_wait = queue_wait;
-        pcap_thread->callback_queue_wait = callback_queue_wait;
-        pcap_thread->timeout = PCAP_THREAD_DEFAULT_TIMEOUT;
-        pcap_thread->queue_size = PCAP_THREAD_DEFAULT_QUEUE_SIZE;
-        pcap_thread->filter_optimize = 1;
+
+        pcap_thread->filter = defaults.filter;
+        pcap_thread->filter_len = defaults.filter_len;
+        pcap_thread->bpf = defaults.bpf;
+        pcap_thread->filter_optimize = defaults.filter_optimize;
+        pcap_thread->filter_netmask = defaults.filter_netmask;
+
+        pcap_thread->queue_size = defaults.queue_size;
+        pcap_thread->callback = defaults.callback;
+        pcap_thread->dropback = defaults.dropback;
+
+        pcap_thread->status = defaults.status;
+        /* errbuf */
+        pcap_thread->pcaplist = defaults.pcaplist;
+        pcap_thread->step = defaults.step;
+
+        pcap_thread->timedrun = defaults.timedrun;
     }
 
     return pcap_thread;
@@ -636,7 +646,7 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
     }
 
 #ifdef HAVE_PCAP_SET_TSTAMP_TYPE
-    if (pcap_thread->buffer_size && (pcap_thread->status = pcap_set_buffer_size(pcap, pcap_thread->buffer_size))) {
+    if (pcap_thread->timestamp_type > -1 && (pcap_thread->status = pcap_set_tstamp_type(pcap, pcap_thread->timestamp_type))) {
         free(pcaplist);
         pcap_close(pcap);
         return PCAP_THREAD_EPCAP;
