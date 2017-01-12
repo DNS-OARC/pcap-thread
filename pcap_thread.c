@@ -1292,6 +1292,43 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         while (run) {
             rfds = fds;
             t2 = t1;
+            if (timedrun) {
+                struct timeval now;
+                struct timeval diff;
+
+                if (gettimeofday(&now, 0)) {
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "gettimeofday()");
+                    return PCAP_THREAD_ERRNO;
+                }
+                if (now.tv_sec > end.tv_sec
+                    || (now.tv_sec == end.tv_sec && (now.tv_usec*1000) >= end.tv_nsec))
+                {
+                    break;
+                }
+
+                if (end.tv_sec > now.tv_sec) {
+                    diff.tv_sec = end.tv_sec - now.tv_sec - 1;
+                    diff.tv_usec = 1000000 - now.tv_usec;
+                    diff.tv_usec += end.tv_nsec / 1000;
+                    if (diff.tv_usec > 1000000) {
+                        diff.tv_sec += diff.tv_usec / 1000000;
+                        diff.tv_usec %= 1000000;
+                    }
+                }
+                else {
+                    diff.tv_sec = 0;
+                    if (end.tv_sec == now.tv_sec && (end.tv_nsec/1000) > now.tv_usec) {
+                        diff.tv_usec = (end.tv_nsec/1000) - now.tv_usec;
+                    }
+                    else {
+                        diff.tv_usec = 0;
+                    }
+                }
+
+                if (diff.tv_sec < t1.tv_sec || (diff.tv_sec == t1.tv_sec && diff.tv_usec < t1.tv_usec)) {
+                    t2 = diff;
+                }
+            }
             if (select(max_fd, &rfds, 0, 0, &t2) == -1) {
                 PCAP_THREAD_SET_ERRBUF(pcap_thread, "select()");
                 return PCAP_THREAD_ERRNO;
@@ -1315,21 +1352,6 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 }
                 else if (packets == -2 || (pcaplist->is_offline && !packets)) {
                     pcaplist->running = 0;
-                }
-            }
-
-            if (run && timedrun) {
-                struct timeval now;
-
-                if (gettimeofday(&now, 0)) {
-                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "gettimeofday()");
-                    return PCAP_THREAD_ERRNO;
-                }
-
-                if (now.tv_sec > end.tv_sec
-                    || (now.tv_sec == end.tv_sec && (now.tv_usec*1000) >= end.tv_nsec))
-                {
-                    run = 0;
                 }
             }
         }
