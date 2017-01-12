@@ -1,3 +1,16 @@
+2017-01-12 Jerry Lundström
+
+    Release 1.2.3
+
+    The non-threaded code did not consider the time left for a timed run
+    so it would run for one timeout period longer then necessary.
+
+    eac378c Handle timed run better with non-threaded code, calculate
+            the diff and use it as timeout if lower then the configurable
+            timeout
+    ea01d0f Fix timestamp type and change way we initialize allocated
+            pcap_thread_t
+
 2017-01-10 Jerry Lundström
 
     Release 1.2.2
