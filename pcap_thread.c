@@ -102,6 +102,9 @@ int pcap_thread_set_use_threads(pcap_thread_t* pcap_thread, const int use_thread
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->use_threads = use_threads;
 
@@ -119,6 +122,9 @@ pcap_thread_queue_mode_t pcap_thread_queue_mode(const pcap_thread_t* pcap_thread
 int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t queue_mode) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     switch (queue_mode) {
@@ -183,6 +189,9 @@ int pcap_thread_set_snaplen(pcap_thread_t* pcap_thread, const int snaplen) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->snaplen = snaplen;
 
@@ -200,6 +209,9 @@ int pcap_thread_promiscuous(const pcap_thread_t* pcap_thread) {
 int pcap_thread_set_promiscuous(pcap_thread_t* pcap_thread, const int promiscuous) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->promiscuous = promiscuous;
@@ -219,6 +231,9 @@ int pcap_thread_set_monitor(pcap_thread_t* pcap_thread, const int monitor) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->monitor = monitor;
 
@@ -236,6 +251,9 @@ int pcap_thread_timeout(const pcap_thread_t* pcap_thread) {
 int pcap_thread_set_timeout(pcap_thread_t* pcap_thread, const int timeout) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->timeout = timeout;
@@ -255,6 +273,9 @@ int pcap_thread_set_buffer_size(pcap_thread_t* pcap_thread, const int buffer_siz
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->buffer_size = buffer_size;
 
@@ -272,6 +293,9 @@ int pcap_thread_timestamp_type(const pcap_thread_t* pcap_thread) {
 int pcap_thread_set_timestamp_type(pcap_thread_t* pcap_thread, const int timestamp_type) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->have_timestamp_type = 1;
@@ -292,6 +316,9 @@ int pcap_thread_set_timestamp_precision(pcap_thread_t* pcap_thread, const int ti
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->have_timestamp_precision = 1;
     pcap_thread->timestamp_precision = timestamp_precision;
@@ -310,6 +337,9 @@ int pcap_thread_immediate_mode(const pcap_thread_t* pcap_thread) {
 int pcap_thread_set_immediate_mode(pcap_thread_t* pcap_thread, const int immediate_mode) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->immediate_mode = immediate_mode;
@@ -333,6 +363,9 @@ int pcap_thread_set_direction(pcap_thread_t* pcap_thread, pcap_direction_t direc
 #ifdef HAVE_PCAP_DIRECTION_T
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->have_direction = 1;
@@ -362,6 +395,9 @@ int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const
     if (!filter_len) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     if (pcap_thread->filter) {
         free(pcap_thread->filter);
@@ -385,6 +421,9 @@ int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->filter_optimize = filter_optimize;
 
@@ -402,6 +441,9 @@ bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread) {
 int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->filter_netmask = filter_netmask;
@@ -422,6 +464,9 @@ int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->timedrun = timedrun;
 
@@ -439,6 +484,9 @@ pcap_thread_activate_mode_t pcap_thread_activate_mode(const pcap_thread_t* pcap_
 int pcap_thread_set_activate_mode(pcap_thread_t* pcap_thread, const pcap_thread_activate_mode_t activate_mode) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->activate_mode = activate_mode;
@@ -465,6 +513,9 @@ int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_si
     if (!queue_size) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->queue_size = queue_size;
 
@@ -476,6 +527,9 @@ int pcap_thread_set_callback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     pcap_thread->callback = callback;
 
@@ -485,6 +539,9 @@ int pcap_thread_set_callback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
 int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t dropback) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     pcap_thread->dropback = dropback;
@@ -508,6 +565,9 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
     }
     if (!device) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     if (pcap_thread->errbuf[0]) {
@@ -698,6 +758,9 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
     if (!file) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     if (pcap_thread->errbuf[0]) {
         memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
@@ -796,6 +859,9 @@ int pcap_thread_activate(pcap_thread_t* pcap_thread) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
 
     if (pcap_thread->errbuf[0]) {
         memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
@@ -855,6 +921,9 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     while (pcap_thread->pcaplist) {
@@ -1335,6 +1404,9 @@ int pcap_thread_next(pcap_thread_t* pcap_thread) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
     if (!pcap_thread->pcaplist) {
         return PCAP_THREAD_NOPCAPS;
     }
@@ -1365,6 +1437,9 @@ int pcap_thread_next(pcap_thread_t* pcap_thread) {
 int pcap_thread_next_reset(pcap_thread_t* pcap_thread) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
     if (!pcap_thread->pcaplist) {
         return PCAP_THREAD_NOPCAPS;
