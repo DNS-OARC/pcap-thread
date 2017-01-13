@@ -67,6 +67,7 @@ extern "C" {
 #endif
 #define PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_DROP
 #define PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT { 0, 10000 }
+#define PCAP_THREAD_DEFAULT_ACTIVATE_MODE PCAP_THREAD_ACTIVATE_MODE_IMMEDIATE
 
 #define PCAP_THREAD_OK              0
 #define PCAP_THREAD_EPCAP           1
@@ -79,6 +80,7 @@ extern "C" {
 #define PCAP_THREAD_NOCALLBACK      8
 #define PCAP_THREAD_ERRNO           9
 #define PCAP_THREAD_NOYIELD         10
+#define PCAP_THREAD_NOSUPPORT       11
 
 #define PCAP_THREAD_EPCAP_STR       "libpcap error"
 #define PCAP_THREAD_ENOMEM_STR      "out of memory"
@@ -90,6 +92,7 @@ extern "C" {
 #define PCAP_THREAD_NOCALLBACK_STR  "no callback set"
 #define PCAP_THREAD_ERRNO_STR       "system error, check errno"
 #define PCAP_THREAD_NOYIELD_STR     "queue more yield requested but not supported"
+#define PCAP_THREAD_NOSUPPORT_STR   "no support for requested function/feature"
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
@@ -99,12 +102,18 @@ typedef void (*pcap_thread_stats_callback_t)(u_char* user, const struct pcap_sta
 typedef int pcap_direction_t;
 #endif
 typedef struct pcap_thread_pcaplist pcap_thread_pcaplist_t;
+typedef enum pcap_thread_activate_mode pcap_thread_activate_mode_t;
 
 enum pcap_thread_queue_mode {
     PCAP_THREAD_QUEUE_MODE_COND,
     PCAP_THREAD_QUEUE_MODE_WAIT,
     PCAP_THREAD_QUEUE_MODE_YIELD,
     PCAP_THREAD_QUEUE_MODE_DROP
+};
+
+enum pcap_thread_activate_mode {
+    PCAP_THREAD_ACTIVATE_MODE_IMMEDIATE,
+    PCAP_THREAD_ACTIVATE_MODE_DELAYED
 };
 
 #ifdef HAVE_PCAP_DIRECTION_T
@@ -131,7 +140,8 @@ enum pcap_thread_queue_mode {
     0, -1, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
     0, 0, { 0, 0 }, 1, PCAP_NETMASK_UNKNOWN, \
     PCAP_THREAD_DEFAULT_QUEUE_SIZE, 0, 0, \
-    0, "", 0, 0, { 0, 0 } \
+    0, "", 0, 0, { 0, 0 }, \
+    PCAP_THREAD_DEFAULT_ACTIVATE_MODE \
 }
 
 struct pcap_thread {
@@ -176,6 +186,8 @@ struct pcap_thread {
     pcap_thread_pcaplist_t* step;
 
     struct timeval          timedrun;
+
+    pcap_thread_activate_mode_t     activate_mode;
 };
 
 #define PCAP_THREAD_SET_ERRBUF(x, y) strncpy(x->errbuf, y, sizeof(x->errbuf) - 1)
@@ -267,6 +279,8 @@ bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask);
 struct timeval pcap_thread_timedrun(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun);
+pcap_thread_activate_mode_t pcap_thread_activate_mode(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_activate_mode(pcap_thread_t* pcap_thread, const pcap_thread_activate_mode_t activate_mode);
 
 size_t pcap_thread_queue_size(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_size);
@@ -277,6 +291,7 @@ int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
 int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void* user);
 int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user);
 int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, void* user);
+int pcap_thread_activate(pcap_thread_t* pcap_thread);
 int pcap_thread_close(pcap_thread_t* pcap_thread);
 
 int pcap_thread_run(pcap_thread_t* pcap_thread);
