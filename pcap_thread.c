@@ -1064,6 +1064,10 @@ static void* _thread(void* vp) {
 
     pcaplist->running = 0;
 
+    pthread_mutex_lock(&(pcaplist->pcap_thread->mutex));
+    pthread_cond_signal(&(pcaplist->pcap_thread->have_packets));
+    pthread_mutex_unlock(&(pcaplist->pcap_thread->mutex));
+
     return 0;
 }
 #endif
