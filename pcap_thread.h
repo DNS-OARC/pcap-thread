@@ -55,18 +55,7 @@ extern "C" {
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT     1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE  64
-#define PCAP_THREAD_DEFAULT_QUEUE_WAIT  { 0, 10000 }
-#ifdef HAVE_PTHREAD
 #define PCAP_THREAD_DEFAULT_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_COND
-#else
-#ifdef HAVE_SCHED_YIELD
-#define PCAP_THREAD_DEFAULT_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_YIELD
-#else
-#define PCAP_THREAD_DEFAULT_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_WAIT
-#endif
-#endif
-#define PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_DROP
-#define PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT { 0, 10000 }
 #define PCAP_THREAD_DEFAULT_ACTIVATE_MODE PCAP_THREAD_ACTIVATE_MODE_IMMEDIATE
 
 #define PCAP_THREAD_OK              0
@@ -81,6 +70,8 @@ extern "C" {
 #define PCAP_THREAD_ERRNO           9
 #define PCAP_THREAD_NOYIELD         10
 #define PCAP_THREAD_EOBSOLETE       11
+#define PCAP_THREAD_ERUNNING        12
+#define PCAP_THREAD_ENOPCAPLIST     13
 
 #define PCAP_THREAD_EPCAP_STR       "libpcap error"
 #define PCAP_THREAD_ENOMEM_STR      "out of memory"
@@ -93,6 +84,8 @@ extern "C" {
 #define PCAP_THREAD_ERRNO_STR       "system error, check errno"
 #define PCAP_THREAD_NOYIELD_STR     "queue more yield requested but not supported"
 #define PCAP_THREAD_EOBSOLETE_STR   "obsolete function or feature"
+#define PCAP_THREAD_ERUNNING_STR    "pcap thread are running, can not complete task"
+#define PCAP_THREAD_ENOPCAPLIST_STR "no internal reference to the pcap that captured the packet"
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
@@ -123,7 +116,8 @@ enum pcap_thread_activate_mode {
 #endif
 
 #ifdef HAVE_PTHREAD
-#define PCAP_THREAD_T_INIT_QUEUE PTHREAD_COND_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, 0,
+#define PCAP_THREAD_T_INIT_QUEUE PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, \
+    0, 0, 0, 0, 0, 0,
 #else
 #define PCAP_THREAD_T_INIT_QUEUE
 #endif
@@ -136,80 +130,89 @@ enum pcap_thread_activate_mode {
 
 #define PCAP_THREAD_T_INIT { \
     0, 0, 0, \
-    1, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_WAIT, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT, PCAP_THREAD_T_INIT_QUEUE \
+    0, 1, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_SIZE, \
+    PCAP_THREAD_T_INIT_QUEUE \
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
-    0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
+    0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, \
+    PCAP_THREAD_T_INIT_DIRECTION_T \
     0, 0, 1, PCAP_NETMASK_UNKNOWN, \
-    PCAP_THREAD_DEFAULT_QUEUE_SIZE, 0, 0, \
-    0, "", 0, 0, { 0, 0 }, \
+    0, 0, \
+    0, "", 0, 0, \
+    { 0, 0 }, \
     PCAP_THREAD_DEFAULT_ACTIVATE_MODE \
 }
 
 struct pcap_thread {
-    unsigned short      have_timestamp_precision : 1;
-    unsigned short      have_timestamp_type : 1;
-    unsigned short      have_direction : 1;
+    unsigned short              have_timestamp_precision : 1;
+    unsigned short              have_timestamp_type : 1;
+    unsigned short              have_direction : 1;
 
+    int                         running;
     int                         use_threads;
     pcap_thread_queue_mode_t    queue_mode;
-    struct timeval              queue_wait;
-    pcap_thread_queue_mode_t    callback_queue_mode;
-    struct timeval              callback_queue_wait;
+    size_t                      queue_size;
+
 #ifdef HAVE_PTHREAD
-    pthread_cond_t              queue_cond;
-    pthread_mutex_t             queue_mutex;
-    int                         queue_run;
+    pthread_cond_t              have_packets;
+    pthread_cond_t              can_write;
+    pthread_mutex_t             mutex;
+
+    struct pcap_pkthdr*         pkthdr;
+    u_char*                     pkt;
+    pcap_thread_pcaplist_t**    pcaplist_pkt;
+    size_t                      read_pos;
+    size_t                      write_pos;
+    size_t                      pkts;
 #endif
 
-    int                     snapshot;
-    int                     snaplen;
-    int                     promiscuous;
-    int                     monitor;
-    int                     timeout;
+    int                         snapshot;
+    int                         snaplen;
+    int                         promiscuous;
+    int                         monitor;
+    int                         timeout;
 
-    int                     buffer_size;
-    int                     timestamp_type;
-    int                     timestamp_precision;
-    int                     immediate_mode;
+    int                         buffer_size;
+    int                         timestamp_type;
+    int                         timestamp_precision;
+    int                         immediate_mode;
+
 #ifdef HAVE_PCAP_DIRECTION_T
-    pcap_direction_t        direction;
+    pcap_direction_t            direction;
 #endif
 
-    char*                   filter;
-    size_t                  filter_len;
-    int                     filter_optimize;
-    bpf_u_int32             filter_netmask;
+    char*                       filter;
+    size_t                      filter_len;
+    int                         filter_optimize;
+    bpf_u_int32                 filter_netmask;
 
-    size_t                  queue_size;
-    pcap_thread_callback_t  callback;
-    pcap_thread_callback_t  dropback;
+    pcap_thread_callback_t      callback;
+    pcap_thread_callback_t      dropback;
 
-    int                     status;
-	char                    errbuf[PCAP_ERRBUF_SIZE];
-    pcap_thread_pcaplist_t* pcaplist;
-    pcap_thread_pcaplist_t* step;
+    int                         status;
+	char                        errbuf[PCAP_ERRBUF_SIZE];
+    pcap_thread_pcaplist_t*     pcaplist;
+    pcap_thread_pcaplist_t*     step;
 
-    struct timeval          timedrun;
+    struct timeval              timedrun;
 
-    pcap_thread_activate_mode_t     activate_mode;
+    pcap_thread_activate_mode_t activate_mode;
 };
 
 #define PCAP_THREAD_SET_ERRBUF(x, y) strncpy(x->errbuf, y, sizeof(x->errbuf) - 1)
 
 #ifdef HAVE_PTHREAD
-#define PCAP_THREAD_PCAPLIST_T_INIT { \
-    0, \
-    0, 0, 0, 0, 0, 0, \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, PTHREAD_COND_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT, 0, \
-    0, { 0, 0 } \
-}
+#define PCAP_THREAD_PCAPLIST_T_INIT_THREAD 0,
 #else
+#define PCAP_THREAD_PCAPLIST_T_INIT_THREAD
+#endif
+
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
     0, \
     0, 0, 0, 0, 0, 0, \
-    0, { 0, 0 } \
+    0, \
+    PCAP_THREAD_PCAPLIST_T_INIT_THREAD \
+    { 0, 0 } \
 }
-#endif
 
 struct pcap_thread_pcaplist {
     unsigned short          have_bpf : 1;
@@ -220,26 +223,13 @@ struct pcap_thread_pcaplist {
     void*                   user;
     int                     running;
     int                     is_offline;
+
+    pcap_thread_t*          pcap_thread;
+
 #ifdef HAVE_PTHREAD
     pthread_t               thread;
-    pthread_cond_t*         queue_cond;
-    pthread_mutex_t*        queue_mutex;
-    size_t                  queue_size;
-    char*                   queue;
-    struct pcap_pkthdr*     pkthdr;
-    u_char*                 pkt;
-    size_t                  read_pos;
-    size_t                  write_pos;
-    pcap_thread_callback_t  dropback;
-    int                     snapshot;
-
-    pthread_cond_t              callback_queue_cond;
-    pthread_mutex_t             callback_queue_mutex;
-    pcap_thread_queue_mode_t    callback_queue_mode;
-    struct timeval              callback_queue_wait;
-    int                         callback_queue_full;
 #endif
-    pcap_thread_callback_t  callback;
+
     struct bpf_program      bpf;
 };
 

@@ -122,13 +122,12 @@ int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_que
     }
 
     switch (queue_mode) {
-        case PCAP_THREAD_QUEUE_MODE_YIELD:
-#ifndef HAVE_SCHED_YIELD
-            return PCAP_THREAD_NOYIELD;
-#endif
         case PCAP_THREAD_QUEUE_MODE_COND:
-        case PCAP_THREAD_QUEUE_MODE_WAIT:
             break;
+        case PCAP_THREAD_QUEUE_MODE_YIELD:
+        case PCAP_THREAD_QUEUE_MODE_WAIT:
+        case PCAP_THREAD_QUEUE_MODE_DROP:
+            return PCAP_THREAD_EOBSOLETE;
         default:
             return PCAP_THREAD_EINVAL;
     }
@@ -139,72 +138,29 @@ int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_que
 }
 
 struct timeval pcap_thread_queue_wait(const pcap_thread_t* pcap_thread) {
-    if (!pcap_thread) {
-        static struct timeval t = { 0, 0 };
-        return t;
-    }
-
-    return pcap_thread->queue_wait;
+    static struct timeval tv = { 0, 0 };
+    return tv;
 }
 
 int pcap_thread_set_queue_wait(pcap_thread_t* pcap_thread, const struct timeval queue_wait) {
-    if (!pcap_thread) {
-        return PCAP_THREAD_EINVAL;
-    }
-
-    pcap_thread->queue_wait = queue_wait;
-
-    return PCAP_THREAD_OK;
+    return PCAP_THREAD_EOBSOLETE;
 }
 
 pcap_thread_queue_mode_t pcap_thread_callback_queue_mode(const pcap_thread_t* pcap_thread) {
-    if (!pcap_thread) {
-        return -1;
-    }
-
-    return pcap_thread->callback_queue_mode;
+    return PCAP_THREAD_EOBSOLETE;
 }
 
 int pcap_thread_set_callback_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t callback_queue_mode) {
-    if (!pcap_thread) {
-        return PCAP_THREAD_EINVAL;
-    }
-
-    switch (callback_queue_mode) {
-        case PCAP_THREAD_QUEUE_MODE_YIELD:
-#ifndef HAVE_SCHED_YIELD
-            return PCAP_THREAD_NOYIELD;
-#endif
-        case PCAP_THREAD_QUEUE_MODE_COND:
-        case PCAP_THREAD_QUEUE_MODE_WAIT:
-        case PCAP_THREAD_QUEUE_MODE_DROP:
-            break;
-        default:
-            return PCAP_THREAD_EINVAL;
-    }
-
-    pcap_thread->callback_queue_mode = callback_queue_mode;
-
-    return PCAP_THREAD_OK;
+    return PCAP_THREAD_EOBSOLETE;
 }
 
 struct timeval pcap_thread_callback_queue_wait(const pcap_thread_t* pcap_thread) {
-    if (!pcap_thread) {
-        static struct timeval t = { 0, 0 };
-        return t;
-    }
-
-    return pcap_thread->callback_queue_wait;
+    static struct timeval tv = { 0, 0 };
+    return tv;
 }
 
 int pcap_thread_set_callback_queue_wait(pcap_thread_t* pcap_thread, const struct timeval callback_queue_wait) {
-    if (!pcap_thread) {
-        return PCAP_THREAD_EINVAL;
-    }
-
-    pcap_thread->callback_queue_wait = callback_queue_wait;
-
-    return PCAP_THREAD_OK;
+    return PCAP_THREAD_EOBSOLETE;
 }
 
 int pcap_thread_snapshot(const pcap_thread_t* pcap_thread) {
@@ -914,20 +870,23 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
         if (pcaplist->name) {
             free(pcaplist->name);
         }
-#ifdef HAVE_PTHREAD
-        if (pcaplist->queue) {
-            free(pcaplist->queue);
-        }
-        if (pcaplist->pkthdr) {
-            free(pcaplist->pkthdr);
-        }
-        if (pcaplist->pkt) {
-            free(pcaplist->pkt);
-        }
-#endif
         free(pcaplist);
     }
 
+#ifdef HAVE_PTHREAD
+    if (pcap_thread->pkthdr) {
+        free(pcap_thread->pkthdr);
+        pcap_thread->pkthdr = 0;
+    }
+    if (pcap_thread->pkt) {
+        free(pcap_thread->pkt);
+        pcap_thread->pkt = 0;
+    }
+    if (pcap_thread->pcaplist_pkt) {
+        free(pcap_thread->pcaplist_pkt);
+        pcap_thread->pcaplist_pkt = 0;
+    }
+#endif
     if (pcap_thread->filter) {
         free(pcap_thread->filter);
         pcap_thread->filter = 0;
@@ -943,83 +902,62 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
 #ifdef HAVE_PTHREAD
 static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt) {
     pcap_thread_pcaplist_t* pcaplist;
-    int check_again = 1;
-    struct timeval t;
+    pcap_thread_t* pcap_thread;
+
+    pthread_testcancel();
 
     if (!user) {
         return;
     }
     pcaplist = (pcap_thread_pcaplist_t*)user;
 
-    if (pkthdr->caplen > pcaplist->snapshot) {
-        if (pcaplist->dropback) {
-            pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+    if (!pcaplist->pcap_thread) {
+        pcaplist->running = 0;
+        return;
+    }
+    pcap_thread = pcaplist->pcap_thread;
+
+    if (pkthdr->caplen > pcap_thread->snapshot) {
+        if (pcap_thread->dropback) {
+            pcap_thread->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
         }
         return;
     }
 
-    while (pcaplist->running && check_again) {
-        pthread_testcancel();
+    if (pthread_mutex_lock(&(pcap_thread->mutex))) {
+        if (pcap_thread->dropback) {
+            pcap_thread->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+        }
+        return;
+    }
 
-        if (!pcaplist->queue[pcaplist->write_pos]) {
+    while (pcaplist->running && pcap_thread->running) {
+        if (pcap_thread->pkts < pcap_thread->queue_size) {
+            pcap_thread->pcaplist_pkt[pcap_thread->write_pos] = pcaplist;
+            memcpy(&(pcap_thread->pkthdr[pcap_thread->write_pos]), pkthdr, sizeof(struct pcap_pkthdr));
+            memcpy(&(pcap_thread->pkt[pcap_thread->write_pos * pcap_thread->snapshot]), pkt, pkthdr->caplen);
+            pcap_thread->write_pos++;
+            if (pcap_thread->write_pos == pcap_thread->queue_size) {
+                pcap_thread->write_pos = 0;
+            }
+            pcap_thread->pkts++;
+
+            pthread_cond_signal(&(pcap_thread->have_packets));
             break;
         }
 
-        switch (pcaplist->callback_queue_mode) {
-            case PCAP_THREAD_QUEUE_MODE_COND:
-                pcaplist->callback_queue_full = 1;
-                if (pthread_cond_wait(&(pcaplist->callback_queue_cond), &(pcaplist->callback_queue_mutex))) {
-                    if (pcaplist->dropback) {
-                        pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
-                    }
-                    return;
-                }
-                break;
-
-            case PCAP_THREAD_QUEUE_MODE_DROP:
-                if (pcaplist->dropback) {
-                    pcaplist->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
-                }
-                return;
-
-            case PCAP_THREAD_QUEUE_MODE_WAIT:
-                t = pcaplist->callback_queue_wait;
-                select(1, NULL, NULL, NULL, &t);
-                break;
-
-#ifdef HAVE_SCHED_YIELD
-            case PCAP_THREAD_QUEUE_MODE_YIELD:
-                sched_yield();
-                break;
-#endif
+        if (pthread_cond_wait(&(pcap_thread->can_write), &(pcap_thread->mutex))) {
+            pcaplist->running = 0;
+            pcap_breakloop(pcaplist->pcap);
+            return;
         }
+        continue;
     }
 
-    memcpy(&(pcaplist->pkthdr[pcaplist->write_pos]), pkthdr, sizeof(struct pcap_pkthdr));
-    memcpy(&(pcaplist->pkt[pcaplist->write_pos * pcaplist->snapshot]), pkt, pkthdr->caplen);
-    pcaplist->queue[pcaplist->write_pos] = 1;
-    pcaplist->write_pos++;
-    if (pcaplist->write_pos == pcaplist->queue_size) {
-        pcaplist->write_pos = 0;
-    }
-    if (pcaplist->queue_cond && pcaplist->queue_mutex) {
-        if (!pthread_mutex_lock(pcaplist->queue_mutex)) {
-            pthread_cond_signal(pcaplist->queue_cond);
-            pthread_mutex_unlock(pcaplist->queue_mutex);
-        }
-    }
-}
-
-static void _cleanup(void* vp) {
-    pcap_thread_pcaplist_t* pcaplist;
-
-    if (!vp) {
+    if (pthread_mutex_unlock(&(pcap_thread->mutex))) {
+        pcaplist->running = 0;
+        pcap_breakloop(pcaplist->pcap);
         return;
-    }
-    pcaplist = (pcap_thread_pcaplist_t*)vp;
-
-    if (pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-        pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
     }
 }
 
@@ -1034,11 +972,10 @@ static void* _thread(void* vp) {
     }
     pcaplist = (pcap_thread_pcaplist_t*)vp;
 
-    if (pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-        pthread_mutex_lock(&(pcaplist->callback_queue_mutex));
+    if (!pcaplist->pcap_thread) {
+        pcaplist->running = 0;
+        return 0;
     }
-
-    pthread_cleanup_push(_cleanup, vp);
 
     /*
      * pcap_loop() might return -2 to indicate pcap_breakloop() was called
@@ -1056,20 +993,7 @@ static void* _thread(void* vp) {
             break;
     }
 
-    pthread_cleanup_pop(0);
-
-    if (pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-        pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
-    }
-
     pcaplist->running = 0;
-
-    if (pcaplist->queue_cond && pcaplist->queue_mutex) {
-        if (!pthread_mutex_lock(pcaplist->queue_mutex)) {
-            pthread_cond_signal(pcaplist->queue_cond);
-            pthread_mutex_unlock(pcaplist->queue_mutex);
-        }
-    }
 
     return 0;
 }
@@ -1083,7 +1007,16 @@ static void _callback2(u_char* user, const struct pcap_pkthdr* pkthdr, const u_c
     }
     pcaplist = (pcap_thread_pcaplist_t*)user;
 
-    pcaplist->callback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+    if (!pcaplist->pcap_thread) {
+        pcaplist->running = 0;
+        return;
+    }
+    if (!pcaplist->pcap_thread->callback) {
+        pcaplist->running = 0;
+        return;
+    }
+
+    pcaplist->pcap_thread->callback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
 }
 
 int pcap_thread_run(pcap_thread_t* pcap_thread) {
@@ -1100,6 +1033,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
     }
     if (!pcap_thread->callback) {
         return PCAP_THREAD_NOCALLBACK;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
     }
 
     if (pcap_thread->errbuf[0]) {
@@ -1122,25 +1058,55 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
 #ifdef HAVE_PTHREAD
     if (pcap_thread->use_threads) {
         int err, all_offline;
-        struct timeval t;
 
         switch (pcap_thread->queue_mode) {
             case PCAP_THREAD_QUEUE_MODE_COND:
-                if ((err = pthread_mutex_lock(&(pcap_thread->queue_mutex)))) {
+                if ((err = pthread_mutex_lock(&(pcap_thread->mutex)))) {
                     errno = err;
                     PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_mutex_lock()");
                     return PCAP_THREAD_ERRNO;
                 }
                 break;
             case PCAP_THREAD_QUEUE_MODE_WAIT:
-                break;
-#ifdef HAVE_SCHED_YIELD
             case PCAP_THREAD_QUEUE_MODE_YIELD:
-                break;
-#endif
+            case PCAP_THREAD_QUEUE_MODE_DROP:
+                return PCAP_THREAD_EOBSOLETE;
             default:
                 return PCAP_THREAD_EINVAL;
         }
+
+        if (pcap_thread->running) {
+            pthread_mutex_unlock(&(pcap_thread->mutex));
+            return PCAP_THREAD_ERUNNING;
+        }
+
+        if (pcap_thread->pkthdr) {
+            free(pcap_thread->pkthdr);
+        }
+        if (!(pcap_thread->pkthdr = calloc(pcap_thread->queue_size, sizeof(struct pcap_pkthdr)))) {
+            pthread_mutex_unlock(&(pcap_thread->mutex));
+            return PCAP_THREAD_ENOMEM;
+        }
+
+        if (pcap_thread->pkt) {
+            free(pcap_thread->pkt);
+        }
+        if (!(pcap_thread->pkt = calloc(pcap_thread->queue_size, pcap_thread->snapshot))) {
+            pthread_mutex_unlock(&(pcap_thread->mutex));
+            return PCAP_THREAD_ENOMEM;
+        }
+
+        if (pcap_thread->pcaplist_pkt) {
+            free(pcap_thread->pcaplist_pkt);
+        }
+        if (!(pcap_thread->pcaplist_pkt = calloc(pcap_thread->queue_size, sizeof(pcap_thread_pcaplist_t*)))) {
+            pthread_mutex_unlock(&(pcap_thread->mutex));
+            return PCAP_THREAD_ENOMEM;
+        }
+
+        pcap_thread->read_pos = 0;
+        pcap_thread->write_pos = 0;
+        pcap_thread->pkts = 0;
 
         all_offline = 1;
         for (pcaplist = pcap_thread->pcaplist; all_offline && pcaplist; pcaplist = pcaplist->next) {
@@ -1150,56 +1116,12 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             }
         }
 
-        pcap_thread->queue_run = 1;
+        pcap_thread->running = 1;
         err = PCAP_THREAD_OK;
-        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
-            if (pcaplist->queue) {
-                free(pcaplist->queue);
-                pcaplist->queue = 0;
-            }
-            if (pcaplist->pkthdr) {
-                free(pcaplist->pkthdr);
-                pcaplist->pkthdr = 0;
-            }
-            if (pcaplist->pkt) {
-                free(pcaplist->pkt);
-                pcaplist->pkt = 0;
-            }
-            pcaplist->queue_size = pcap_thread->queue_size;
-            pcaplist->read_pos = 0;
-            pcaplist->write_pos = 0;
-            pcaplist->dropback = pcap_thread->dropback;
-            pcaplist->snapshot = pcap_thread->snapshot;
-            if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-                pcaplist->queue_cond = &(pcap_thread->queue_cond);
-                pcaplist->queue_mutex = &(pcap_thread->queue_mutex);
-            }
-            else {
-                pcaplist->queue_cond = 0;
-                pcaplist->queue_mutex = 0;
-            }
-            if (all_offline && pcap_thread->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_DROP) {
-                pcaplist->callback_queue_mode = PCAP_THREAD_QUEUE_MODE_COND;
-            }
-            else {
-                pcaplist->callback_queue_mode = pcap_thread->callback_queue_mode;
-            }
-            pcaplist->callback_queue_wait = pcap_thread->callback_queue_wait;
-            pcaplist->callback_queue_full = 0;
-            pcaplist->running = 1;
 
-            if (!(pcaplist->queue = calloc(pcaplist->queue_size, sizeof(char)))) {
-                err = PCAP_THREAD_ENOMEM;
-                break;
-            }
-            if (!(pcaplist->pkthdr = calloc(pcaplist->queue_size, sizeof(struct pcap_pkthdr)))) {
-                err = PCAP_THREAD_ENOMEM;
-                break;
-            }
-            if (!(pcaplist->pkt = calloc(pcaplist->queue_size, pcap_thread->snapshot))) {
-                err = PCAP_THREAD_ENOMEM;
-                break;
-            }
+        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+            pcaplist->pcap_thread = pcap_thread;
+            pcaplist->running = 1;
 
             if ((err = pthread_create(&(pcaplist->thread), 0, _thread, (void*)pcaplist))) {
                 errno = err;
@@ -1209,99 +1131,49 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             }
         }
 
-        while (!err && run && pcap_thread->queue_run) {
-            switch (pcap_thread->queue_mode) {
-                case PCAP_THREAD_QUEUE_MODE_COND:
-                    if (timedrun) {
-                        err = pthread_cond_timedwait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex), &end);
-                        if (err == ETIMEDOUT) {
-                            err = PCAP_THREAD_OK;
-                        }
-                        else if (err) {
-                            errno = err;
-                            err = PCAP_THREAD_ERRNO;
-                            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_timedwait()");
-                        }
-                        break;
-                    }
-                    if ((err = pthread_cond_wait(&(pcap_thread->queue_cond), &(pcap_thread->queue_mutex)))) {
-                        errno = err;
-                        err = PCAP_THREAD_ERRNO;
-                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_wait()");
-                    }
+        while (err == PCAP_THREAD_OK && run && pcap_thread->running) {
+            while (pcap_thread->pkts) {
+                if (!pcap_thread->pcaplist_pkt[pcap_thread->read_pos]) {
+                    err = PCAP_THREAD_ENOPCAPLIST;
                     break;
+                }
 
-                case PCAP_THREAD_QUEUE_MODE_WAIT:
-                    t = pcap_thread->queue_wait;
-                    select(1, NULL, NULL, NULL, &t);
-                    break;
+                pcap_thread->callback(
+                    pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->user,
+                    &(pcap_thread->pkthdr[pcap_thread->read_pos]),
+                    &(pcap_thread->pkt[pcap_thread->read_pos * pcap_thread->snapshot]),
+                    pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->name,
+                    pcap_datalink(pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->pcap)
+                );
 
-#ifdef HAVE_SCHED_YIELD
-                case PCAP_THREAD_QUEUE_MODE_YIELD:
-                    sched_yield();
-                    break;
-#endif
-                default:
-                    break;
+                pcap_thread->pcaplist_pkt[pcap_thread->read_pos] = 0;
+                pcap_thread->read_pos++;
+                if (pcap_thread->read_pos == pcap_thread->queue_size) {
+                    pcap_thread->read_pos = 0;
+                }
+                pcap_thread->pkts--;
             }
 
             if (err != PCAP_THREAD_OK)
                 break;
+
+            if ((err = pthread_cond_broadcast(&(pcap_thread->can_write)))) {
+                errno = err;
+                err = PCAP_THREAD_ERRNO;
+                PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_broadcast()");
+                break;
+            }
 
             run = 0;
             for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
-                int read = 0;
-
                 if (pcaplist->running) {
                     run = 1;
                 }
-                while (pcaplist->queue[pcaplist->read_pos]) {
-                    pcap_thread->callback(
-                        pcaplist->user,
-                        &(pcaplist->pkthdr[pcaplist->read_pos]),
-                        &(pcaplist->pkt[pcaplist->read_pos * pcaplist->snapshot]),
-                        pcaplist->name,
-                        pcap_datalink(pcaplist->pcap)
-                    );
-
-                    pcaplist->queue[pcaplist->read_pos] = 0;
-                    pcaplist->read_pos++;
-                    if (pcaplist->read_pos == pcaplist->queue_size) {
-                        pcaplist->read_pos = 0;
-                    }
-                    read++;
-                }
-                if (read && pcaplist->callback_queue_mode == PCAP_THREAD_QUEUE_MODE_COND && pcaplist->callback_queue_full) {
-                    /*
-                     * TODO: Unsure if these errors should break the loop, maybe set thread to not running and kill it
-                     */
-                    if ((err = pthread_mutex_lock(&(pcaplist->callback_queue_mutex)))) {
-                        errno = err;
-                        err = PCAP_THREAD_ERRNO;
-                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_mutex_lock(callback_queue)");
-                        break;
-                    }
-                    pcaplist->callback_queue_full = 0;
-                    if ((err = pthread_cond_signal(&(pcaplist->callback_queue_cond)))) {
-                        errno = err;
-                        err = PCAP_THREAD_ERRNO;
-                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_signal(callback_queue)");
-                        pthread_mutex_unlock(&(pcaplist->callback_queue_mutex));
-                        break;
-                    }
-                    if ((err = pthread_mutex_unlock(&(pcaplist->callback_queue_mutex)))) {
-                        errno = err;
-                        err = PCAP_THREAD_ERRNO;
-                        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_mutex_unlock(callback_queue)");
-                        break;
-                    }
-                }
             }
-
-            if (err != PCAP_THREAD_OK)
+            if (!run)
                 break;
 
-            if (run && timedrun) {
+            if (timedrun) {
                 struct timeval now;
 
                 if (gettimeofday(&now, 0)) {
@@ -1313,27 +1185,41 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 if (now.tv_sec > end.tv_sec
                     || (now.tv_sec == end.tv_sec && (now.tv_usec*1000) >= end.tv_nsec))
                 {
-                    run = 0;
+                    break;
+                }
+
+                err = pthread_cond_timedwait(&(pcap_thread->have_packets), &(pcap_thread->mutex), &end);
+                if (err == ETIMEDOUT) {
+                    err = PCAP_THREAD_OK;
+                }
+                else if (err) {
+                    errno = err;
+                    err = PCAP_THREAD_ERRNO;
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_timedwait()");
+                    break;
+                }
+            }
+            else {
+                if ((err = pthread_cond_wait(&(pcap_thread->have_packets), &(pcap_thread->mutex)))) {
+                    errno = err;
+                    err = PCAP_THREAD_ERRNO;
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_cond_wait()");
+                    break;
                 }
             }
         }
 
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
             pcaplist->running = 0;
-        }
-
-        pcap_thread->queue_run = 0;
-        if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-            pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-        }
-
-        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+            pcap_breakloop(pcaplist->pcap);
             if (pcaplist->thread) {
-                pcap_breakloop(pcaplist->pcap);
                 pthread_cancel(pcaplist->thread);
                 pcaplist->thread = 0;
             }
         }
+
+        pcap_thread->running = 0;
+        pthread_mutex_unlock(&(pcap_thread->mutex));
 
         return err;
     }
@@ -1344,6 +1230,8 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         int max_fd = 0;
         struct timeval t1, t2;
 
+        pcap_thread->running = 1;
+
         FD_ZERO(&fds);
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
             int fd = pcap_get_selectable_fd(pcaplist->pcap);
@@ -1353,9 +1241,10 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 max_fd = fd;
 
             if (!pcaplist->is_offline && (pcap_thread->status = pcap_setnonblock(pcaplist->pcap, 1, pcap_thread->errbuf))) {
+                pcap_thread->running = 0;
                 return PCAP_THREAD_EPCAP;
             }
-            pcaplist->callback = pcap_thread->callback;
+            pcaplist->pcap_thread = pcap_thread;
             pcaplist->running = 1;
         }
 
@@ -1371,6 +1260,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
 
                 if (gettimeofday(&now, 0)) {
                     PCAP_THREAD_SET_ERRBUF(pcap_thread, "gettimeofday()");
+                    pcap_thread->running = 0;
                     return PCAP_THREAD_ERRNO;
                 }
                 if (now.tv_sec > end.tv_sec
@@ -1404,6 +1294,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             }
             if (select(max_fd, &rfds, 0, 0, &t2) == -1) {
                 PCAP_THREAD_SET_ERRBUF(pcap_thread, "select()");
+                pcap_thread->running = 0;
                 return PCAP_THREAD_ERRNO;
             }
 
@@ -1422,6 +1313,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 if (packets == -1) {
                     pcap_thread->status = -1;
                     PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_dispatch()");
+                    pcap_thread->running = 0;
                     return PCAP_THREAD_EPCAP;
                 }
                 else if (packets == -2 || (pcaplist->is_offline && !packets)) {
@@ -1429,6 +1321,8 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 }
             }
         }
+
+        pcap_thread->running = 0;
     }
 
     return PCAP_THREAD_OK;
@@ -1495,18 +1389,11 @@ int pcap_thread_stop(pcap_thread_t* pcap_thread) {
         pcaplist->running = 0;
         pcap_breakloop(pcaplist->pcap);
     }
+    pcap_thread->running = 0;
 
 #ifdef HAVE_PTHREAD
-    pcap_thread->queue_run = 0;
-
-    if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_COND) {
-        /*
-         * Lock the queue mutex but ignore return if it is already owned by this thread
-         */
-        pthread_mutex_lock(&(pcap_thread->queue_mutex));
-        pthread_cond_signal(&(pcap_thread->queue_cond));
-        pthread_mutex_unlock(&(pcap_thread->queue_mutex));
-    }
+    pthread_cond_broadcast(&(pcap_thread->have_packets));
+    pthread_cond_broadcast(&(pcap_thread->can_write));
 #endif
 
     return PCAP_THREAD_OK;
@@ -1592,6 +1479,10 @@ const char* pcap_thread_strerr(int error) {
             return PCAP_THREAD_NOYIELD_STR;
         case PCAP_THREAD_EOBSOLETE:
             return PCAP_THREAD_EOBSOLETE_STR;
+        case PCAP_THREAD_ERUNNING:
+            return PCAP_THREAD_ERUNNING_STR;
+        case PCAP_THREAD_ENOPCAPLIST:
+            return PCAP_THREAD_ENOPCAPLIST_STR;
     }
     return "UNKNOWN";
 }
