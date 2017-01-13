@@ -845,6 +845,7 @@ int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, 
 int pcap_thread_activate(pcap_thread_t* pcap_thread) {
 #ifdef HAVE_PCAP_ACTIVATE
     pcap_thread_pcaplist_t* pcaplist;
+#endif
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -855,6 +856,7 @@ int pcap_thread_activate(pcap_thread_t* pcap_thread) {
     }
     pcap_thread->status = 0;
 
+#ifdef HAVE_PCAP_ACTIVATE
     for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
         if (pcaplist->is_offline) {
             continue;
@@ -865,11 +867,9 @@ int pcap_thread_activate(pcap_thread_t* pcap_thread) {
             return PCAP_THREAD_EPCAP;
         }
     }
+#endif
 
     return PCAP_THREAD_OK;
-#else
-    return PCAP_THREAD_NOSUPPORT;
-#endif
 }
 
 int pcap_thread_close(pcap_thread_t* pcap_thread) {
@@ -1560,8 +1560,6 @@ const char* pcap_thread_strerr(int error) {
             return PCAP_THREAD_ERRNO_STR;
         case PCAP_THREAD_NOYIELD:
             return PCAP_THREAD_NOYIELD_STR;
-        case PCAP_THREAD_NOSUPPORT:
-            return PCAP_THREAD_NOSUPPORT_STR;
     }
     return "UNKNOWN";
 }

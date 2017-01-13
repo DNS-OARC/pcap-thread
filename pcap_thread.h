@@ -80,7 +80,6 @@ extern "C" {
 #define PCAP_THREAD_NOCALLBACK      8
 #define PCAP_THREAD_ERRNO           9
 #define PCAP_THREAD_NOYIELD         10
-#define PCAP_THREAD_NOSUPPORT       11
 
 #define PCAP_THREAD_EPCAP_STR       "libpcap error"
 #define PCAP_THREAD_ENOMEM_STR      "out of memory"
@@ -92,7 +91,6 @@ extern "C" {
 #define PCAP_THREAD_NOCALLBACK_STR  "no callback set"
 #define PCAP_THREAD_ERRNO_STR       "system error, check errno"
 #define PCAP_THREAD_NOYIELD_STR     "queue more yield requested but not supported"
-#define PCAP_THREAD_NOSUPPORT_STR   "no support for requested function/feature"
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
