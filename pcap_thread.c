@@ -1034,7 +1034,7 @@ static void* _thread(void* vp) {
     pcap_thread_pcaplist_t* pcaplist;
     int ret = 0;
 
-    pthread_detach(pthread_self());
+    /*pthread_detach(pthread_self());*/
 
     if (!vp) {
         return 0;
@@ -1287,13 +1287,19 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
             pcap_breakloop(pcaplist->pcap);
             if (pcaplist->thread) {
                 pthread_cancel(pcaplist->thread);
+            }
+        }
+
+        pthread_mutex_unlock(&(pcap_thread->mutex));
+
+        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+            if (pcaplist->thread) {
+                pthread_join(pcaplist->thread, 0);
                 pcaplist->thread = 0;
             }
         }
 
         pcap_thread->running = 0;
-        pthread_mutex_unlock(&(pcap_thread->mutex));
-
         return err;
     }
     else
