@@ -66,53 +66,12 @@ int pcap_thread_version_patch(void) {
  * Create/Free
  */
 
+static pcap_thread_t _pcap_thread_defaults = PCAP_THREAD_T_INIT;
+
 pcap_thread_t* pcap_thread_create(void) {
-    static pcap_thread_t defaults = PCAP_THREAD_T_INIT;
     pcap_thread_t* pcap_thread = calloc(1, sizeof(pcap_thread_t));
     if (pcap_thread) {
-        pcap_thread->use_threads = defaults.use_threads;
-        pcap_thread->queue_mode = defaults.queue_mode;
-        pcap_thread->queue_wait = defaults.queue_wait;
-        pcap_thread->callback_queue_mode = defaults.callback_queue_mode;
-        pcap_thread->callback_queue_wait = defaults.callback_queue_wait;
-#ifdef HAVE_PTHREAD
-        pcap_thread->queue_cond = defaults.queue_cond;
-        pcap_thread->queue_mutex = defaults.queue_mutex;
-        pcap_thread->queue_run = defaults.queue_run;
-#endif
-
-        pcap_thread->snapshot = defaults.snapshot;
-        pcap_thread->snaplen = defaults.snaplen;
-        pcap_thread->promiscuous = defaults.promiscuous;
-        pcap_thread->monitor = defaults.monitor;
-        pcap_thread->timeout = defaults.timeout;
-
-        pcap_thread->buffer_size = defaults.buffer_size;
-        pcap_thread->timestamp_type = defaults.timestamp_type;
-        pcap_thread->timestamp_precision = defaults.timestamp_precision;
-        pcap_thread->immediate_mode = defaults.immediate_mode;
-#ifdef HAVE_PCAP_DIRECTION_T
-        pcap_thread->direction = defaults.direction;
-#endif
-
-        pcap_thread->filter = defaults.filter;
-        pcap_thread->filter_len = defaults.filter_len;
-        pcap_thread->bpf = defaults.bpf;
-        pcap_thread->filter_optimize = defaults.filter_optimize;
-        pcap_thread->filter_netmask = defaults.filter_netmask;
-
-        pcap_thread->queue_size = defaults.queue_size;
-        pcap_thread->callback = defaults.callback;
-        pcap_thread->dropback = defaults.dropback;
-
-        pcap_thread->status = defaults.status;
-        /* errbuf */
-        pcap_thread->pcaplist = defaults.pcaplist;
-        pcap_thread->step = defaults.step;
-
-        pcap_thread->timedrun = defaults.timedrun;
-
-        pcap_thread->activate_mode = defaults.activate_mode;
+        memcpy(pcap_thread, &_pcap_thread_defaults, sizeof(pcap_thread_t));
     }
 
     return pcap_thread;
@@ -359,6 +318,7 @@ int pcap_thread_set_timestamp_type(pcap_thread_t* pcap_thread, const int timesta
         return PCAP_THREAD_EINVAL;
     }
 
+    pcap_thread->have_timestamp_type = 1;
     pcap_thread->timestamp_type = timestamp_type;
 
     return PCAP_THREAD_OK;
@@ -377,6 +337,7 @@ int pcap_thread_set_timestamp_precision(pcap_thread_t* pcap_thread, const int ti
         return PCAP_THREAD_EINVAL;
     }
 
+    pcap_thread->have_timestamp_precision = 1;
     pcap_thread->timestamp_precision = timestamp_precision;
 
     return PCAP_THREAD_OK;
@@ -418,6 +379,7 @@ int pcap_thread_set_direction(pcap_thread_t* pcap_thread, pcap_direction_t direc
         return PCAP_THREAD_EINVAL;
     }
 
+    pcap_thread->have_direction = 1;
     pcap_thread->direction = direction;
 
     return PCAP_THREAD_OK;
@@ -578,11 +540,12 @@ int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
  * Open/Close
  */
 
-static pcap_thread_pcaplist_t _pcaplist_default = PCAP_THREAD_PCAPLIST_T_INIT;
+static pcap_thread_pcaplist_t _pcaplist_defaults = PCAP_THREAD_PCAPLIST_T_INIT;
 
 int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user) {
     pcap_t*                 pcap;
     pcap_thread_pcaplist_t* pcaplist;
+    int                     snapshot;
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -595,17 +558,19 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
         memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
     }
     pcap_thread->status = 0;
+
     if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
         return PCAP_THREAD_ENOMEM;
     }
-    memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+    memcpy(pcaplist, &_pcaplist_defaults, sizeof(pcap_thread_pcaplist_t));
     if (!(pcaplist->name = strdup(device))) {
         free(pcaplist);
         return PCAP_THREAD_ENOMEM;
     }
 
 #ifdef HAVE_PCAP_CREATE
-    if (!(pcap = pcap_create(device, pcap_thread->errbuf))) {
+    if (!(pcap = pcap_create(pcaplist->name, pcap_thread->errbuf))) {
+        free(pcaplist->name);
         free(pcaplist);
         return PCAP_THREAD_EPCAP;
     }
@@ -613,103 +578,146 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
     if (pcap_thread->monitor) {
         pcap_thread->status = pcap_can_set_rfmon(pcap);
         if (pcap_thread->status == 0) {
-            free(pcaplist);
             pcap_close(pcap);
+            free(pcaplist->name);
+            free(pcaplist);
             return PCAP_THREAD_ENOMON;
         }
         if (pcap_thread->status != 1) {
-            free(pcaplist);
             pcap_close(pcap);
+            free(pcaplist->name);
+            free(pcaplist);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_can_set_rfmon()");
             return PCAP_THREAD_EPCAP;
         }
     }
 
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
-    if (pcap_thread->timestamp_precision && (pcap_thread->status = pcap_set_tstamp_precision(pcap, pcap_thread->timestamp_precision))) {
-        free(pcaplist);
+    if (pcap_thread->have_timestamp_precision && (pcap_thread->status = pcap_set_tstamp_precision(pcap, pcap_thread->timestamp_precision))) {
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_tstamp_precision()");
         return PCAP_THREAD_EPCAP;
     }
 #endif
 #ifdef HAVE_PCAP_SET_IMMEDIATE_MODE
     if (pcap_thread->immediate_mode && (pcap_thread->status = pcap_set_immediate_mode(pcap, 1))) {
-        free(pcaplist);
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_immediate_mode()");
         return PCAP_THREAD_EPCAP;
     }
 #endif
 
     if (pcap_thread->monitor && (pcap_thread->status = pcap_set_rfmon(pcap, 1))) {
-        free(pcaplist);
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_rfmon()");
         return PCAP_THREAD_EPCAP;
     }
     if (pcap_thread->snaplen && (pcap_thread->status = pcap_set_snaplen(pcap, pcap_thread->snaplen))) {
-        free(pcaplist);
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_snaplen()");
         return PCAP_THREAD_EPCAP;
     }
     if (pcap_thread->promiscuous && (pcap_thread->status = pcap_set_promisc(pcap, pcap_thread->promiscuous))) {
-        free(pcaplist);
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_promisc()");
         return PCAP_THREAD_EPCAP;
     }
     if (pcap_thread->timeout && (pcap_thread->status = pcap_set_timeout(pcap, pcap_thread->timeout))) {
-        free(pcaplist);
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_timeout()");
         return PCAP_THREAD_EPCAP;
     }
     if (pcap_thread->buffer_size && (pcap_thread->status = pcap_set_buffer_size(pcap, pcap_thread->buffer_size))) {
-        free(pcaplist);
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_buffer_size()");
         return PCAP_THREAD_EPCAP;
     }
 
 #ifdef HAVE_PCAP_SET_TSTAMP_TYPE
-    if (pcap_thread->timestamp_type > -1 && (pcap_thread->status = pcap_set_tstamp_type(pcap, pcap_thread->timestamp_type))) {
-        free(pcaplist);
+    if (pcap_thread->have_timestamp_type > -1 && (pcap_thread->status = pcap_set_tstamp_type(pcap, pcap_thread->timestamp_type))) {
         pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_set_tstamp_type()");
         return PCAP_THREAD_EPCAP;
     }
 #endif
 
-    if (pcap_thread->activate_mode == PCAP_THREAD_ACTIVATE_MODE_IMMEDIATE && (pcap_thread->status = pcap_activate(pcap))) {
-        free(pcaplist);
-        pcap_close(pcap);
-        return PCAP_THREAD_EPCAP;
-    }
-#ifdef HAVE_PCAP_SETDIRECTION
-#ifndef HAVE_PCAP_DIRECTION_T
-    if (pcap_thread->direction) {
-        free(pcaplist);
-        pcap_close(pcap);
-        return PCAP_THREAD_ENODIR;
-    }
-#else
-    if (pcap_thread->direction && (pcap_thread->status = pcap_setdirection(pcap, pcap_thread->direction))) {
-        free(pcaplist);
-        pcap_close(pcap);
-        return PCAP_THREAD_EPCAP;
-    }
-#endif
-#endif
-#else /* HAVE_PCAP_CREATE */
-    if (!(pcap = pcap_open_live(device, pcap_thread->snaplen, pcap_thread->promiscuous, pcap_thread->timeout, pcap_thread->errbuf))) {
-        free(pcaplist);
-        return PCAP_THREAD_EPCAP;
-    }
-#endif
-
-    if (pcap_thread->filter) {
-        if ((pcap_thread->status = pcap_compile(pcap, &(pcap_thread->bpf), pcap_thread->filter, pcap_thread->filter_optimize, pcap_thread->filter_netmask))) {
-            free(pcaplist);
+    if (pcap_thread->activate_mode == PCAP_THREAD_ACTIVATE_MODE_IMMEDIATE) {
+        if ((pcap_thread->status = pcap_activate(pcap))) {
             pcap_close(pcap);
+            free(pcaplist->name);
+            free(pcaplist);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_activate()");
             return PCAP_THREAD_EPCAP;
         }
-        if ((pcap_thread->status = pcap_setfilter(pcap, &(pcap_thread->bpf)))) {
-            free(pcaplist);
+
+#ifdef HAVE_PCAP_SETDIRECTION
+#ifdef HAVE_PCAP_DIRECTION_T
+        if (pcap_thread->have_direction && (pcap_thread->status = pcap_setdirection(pcap, pcap_thread->direction))) {
             pcap_close(pcap);
+            free(pcaplist->name);
+            free(pcaplist);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setdirection()");
             return PCAP_THREAD_EPCAP;
+        }
+#endif
+#endif
+    }
+#else /* HAVE_PCAP_CREATE */
+    if (!(pcap = pcap_open_live(pcaplist->name, pcap_thread->snaplen, pcap_thread->promiscuous, pcap_thread->timeout, pcap_thread->errbuf))) {
+        free(pcaplist->name);
+        free(pcaplist);
+        return PCAP_THREAD_EPCAP;
+    }
+#endif
+
+    if (pcap_thread->activate_mode == PCAP_THREAD_ACTIVATE_MODE_IMMEDIATE) {
+        if (pcap_thread->filter) {
+            if ((pcap_thread->status = pcap_compile(pcap, &(pcaplist->bpf), pcap_thread->filter, pcap_thread->filter_optimize, pcap_thread->filter_netmask))) {
+                pcap_close(pcap);
+                free(pcaplist->name);
+                free(pcaplist);
+                PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_compile()");
+                return PCAP_THREAD_EPCAP;
+            }
+            pcaplist->have_bpf = 1;
+            if ((pcap_thread->status = pcap_setfilter(pcap, &(pcaplist->bpf)))) {
+                pcap_freecode(&(pcaplist->bpf));
+                pcap_close(pcap);
+                free(pcaplist->name);
+                free(pcaplist);
+                PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setfilter()");
+                return PCAP_THREAD_EPCAP;
+            }
+        }
+
+        if ((snapshot = pcap_snapshot(pcap)) < 0) {
+            pcap_thread->status = snapshot;
+            if (pcaplist->have_bpf)
+                pcap_freecode(&(pcaplist->bpf));
+            pcap_close(pcap);
+            free(pcaplist->name);
+            free(pcaplist);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_snapshot()");
+            return PCAP_THREAD_EPCAP;
+        }
+        if (snapshot > pcap_thread->snapshot) {
+            pcap_thread->snapshot = snapshot;
         }
     }
 
@@ -719,9 +727,6 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
         pcaplist->next = pcap_thread->pcaplist;
     }
     pcap_thread->pcaplist = pcaplist;
-    if (pcap_snapshot(pcap) > pcap_thread->snapshot) {
-        pcap_thread->snapshot = pcap_snapshot(pcap);
-    }
 
     return PCAP_THREAD_OK;
 }
@@ -729,6 +734,7 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
 int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user) {
     pcap_t*                 pcap;
     pcap_thread_pcaplist_t* pcaplist;
+    int                     snapshot;
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -741,10 +747,11 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
         memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
     }
     pcap_thread->status = 0;
+
     if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
         return PCAP_THREAD_ENOMEM;
     }
-    memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
+    memcpy(pcaplist, &_pcaplist_defaults, sizeof(pcap_thread_pcaplist_t));
     pcaplist->is_offline = 1;
     if (!(pcaplist->name = strdup(file))) {
         free(pcaplist);
@@ -752,28 +759,54 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
     }
 
 #ifdef HAVE_PCAP_OPEN_OFFLINE_WITH_TSTAMP_PRECISION
-    if (!(pcap = pcap_open_offline_with_tstamp_precision(file, pcap_thread->timestamp_precision, pcap_thread->errbuf))) {
-        free(pcaplist);
-        return PCAP_THREAD_EPCAP;
+    if (pcap_thread->have_timestamp_precision) {
+        if (!(pcap = pcap_open_offline_with_tstamp_precision(pcaplist->name, pcap_thread->timestamp_precision, pcap_thread->errbuf))) {
+            free(pcaplist->name);
+            free(pcaplist);
+            return PCAP_THREAD_EPCAP;
+        }
     }
-#else
-    if (!(pcap = pcap_open_offline(file, pcap_thread->errbuf))) {
-        free(pcaplist);
-        return PCAP_THREAD_EPCAP;
-    }
+    else
 #endif
+    {
+        if (!(pcap = pcap_open_offline(pcaplist->name, pcap_thread->errbuf))) {
+            free(pcaplist->name);
+            free(pcaplist);
+            return PCAP_THREAD_EPCAP;
+        }
+    }
 
     if (pcap_thread->filter) {
-        if ((pcap_thread->status = pcap_compile(pcap, &(pcap_thread->bpf), pcap_thread->filter, pcap_thread->filter_optimize, pcap_thread->filter_netmask))) {
-            free(pcaplist);
+        if ((pcap_thread->status = pcap_compile(pcap, &(pcaplist->bpf), pcap_thread->filter, pcap_thread->filter_optimize, pcap_thread->filter_netmask))) {
             pcap_close(pcap);
+            free(pcaplist->name);
+            free(pcaplist);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_compile()");
             return PCAP_THREAD_EPCAP;
         }
-        if ((pcap_thread->status = pcap_setfilter(pcap, &(pcap_thread->bpf)))) {
-            free(pcaplist);
+        pcaplist->have_bpf = 1;
+        if ((pcap_thread->status = pcap_setfilter(pcap, &(pcaplist->bpf)))) {
+            pcap_freecode(&(pcaplist->bpf));
             pcap_close(pcap);
+            free(pcaplist->name);
+            free(pcaplist);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setfilter()");
             return PCAP_THREAD_EPCAP;
         }
+    }
+
+    if ((snapshot = pcap_snapshot(pcap)) < 0) {
+        pcap_thread->status = snapshot;
+        if (pcaplist->have_bpf)
+            pcap_freecode(&(pcaplist->bpf));
+        pcap_close(pcap);
+        free(pcaplist->name);
+        free(pcaplist);
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_snapshot()");
+        return PCAP_THREAD_EPCAP;
+    }
+    if (snapshot > pcap_thread->snapshot) {
+        pcap_thread->snapshot = snapshot;
     }
 
     pcaplist->pcap = pcap;
@@ -782,70 +815,27 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
         pcaplist->next = pcap_thread->pcaplist;
     }
     pcap_thread->pcaplist = pcaplist;
-    if (pcap_snapshot(pcap) > pcap_thread->snapshot) {
-        pcap_thread->snapshot = pcap_snapshot(pcap);
-    }
 
     return PCAP_THREAD_OK;
 }
 
 int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, void* user) {
-    pcap_thread_pcaplist_t* pcaplist;
-    int nonblock;
-    int is_offline = 0;
-
-    if (!pcap_thread) {
-        return PCAP_THREAD_EINVAL;
-    }
-    if (!pcap) {
-        return PCAP_THREAD_EINVAL;
-    }
+    (void)pcap_thread;
+    (void)name;
+    (void)pcap;
+    (void)user;
 
     if (pcap_thread->errbuf[0]) {
         memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
     }
     pcap_thread->status = 0;
 
-    if (pcap_file(pcap)) {
-        is_offline = 1;
-    }
-    else {
-        nonblock = pcap_getnonblock(pcap, pcap_thread->errbuf);
-        if (nonblock < 0) {
-            return PCAP_THREAD_EPCAP;
-        }
-        if (nonblock > 0) {
-            return PCAP_THREAD_EWOULDBLOCK;
-        }
-    }
-
-    if (!(pcaplist = malloc(sizeof(pcap_thread_pcaplist_t)))) {
-        return PCAP_THREAD_ENOMEM;
-    }
-    memcpy(pcaplist, &_pcaplist_default, sizeof(pcap_thread_pcaplist_t));
-    pcaplist->is_offline = is_offline;
-    if (!(pcaplist->name = strdup(name))) {
-        free(pcaplist);
-        return PCAP_THREAD_ENOMEM;
-    }
-
-    pcaplist->pcap = pcap;
-    pcaplist->user = user;
-    if (pcap_thread->pcaplist) {
-        pcaplist->next = pcap_thread->pcaplist;
-    }
-    pcap_thread->pcaplist = pcaplist;
-    if (!pcap_thread->snapshot || pcap_snapshot(pcap) < pcap_thread->snapshot) {
-        pcap_thread->snapshot = pcap_snapshot(pcap);
-    }
-
-    return PCAP_THREAD_OK;
+    return PCAP_THREAD_EOBSOLETE;
 }
 
 int pcap_thread_activate(pcap_thread_t* pcap_thread) {
-#ifdef HAVE_PCAP_ACTIVATE
     pcap_thread_pcaplist_t* pcaplist;
-#endif
+    int snapshot;
 
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -856,18 +846,50 @@ int pcap_thread_activate(pcap_thread_t* pcap_thread) {
     }
     pcap_thread->status = 0;
 
-#ifdef HAVE_PCAP_ACTIVATE
     for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
         if (pcaplist->is_offline) {
             continue;
         }
 
+#ifdef HAVE_PCAP_ACTIVATE
         if ((pcap_thread->status = pcap_activate(pcaplist->pcap))) {
-            strncpy(pcap_thread->errbuf, pcap_geterr(pcaplist->pcap), sizeof(pcap_thread->errbuf) - 1);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_activate()");
             return PCAP_THREAD_EPCAP;
         }
-    }
 #endif
+
+#ifdef HAVE_PCAP_SETDIRECTION
+#ifdef HAVE_PCAP_DIRECTION_T
+        if (pcap_thread->have_direction && (pcap_thread->status = pcap_setdirection(pcaplist->pcap, pcap_thread->direction))) {
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setdirection()");
+            return PCAP_THREAD_EPCAP;
+        }
+#endif
+#endif
+
+        if (pcap_thread->filter) {
+            if (pcaplist->have_bpf)
+                pcap_freecode(&(pcaplist->bpf));
+            if ((pcap_thread->status = pcap_compile(pcaplist->pcap, &(pcaplist->bpf), pcap_thread->filter, pcap_thread->filter_optimize, pcap_thread->filter_netmask))) {
+                PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_compile()");
+                return PCAP_THREAD_EPCAP;
+            }
+            pcaplist->have_bpf = 1;
+            if ((pcap_thread->status = pcap_setfilter(pcaplist->pcap, &(pcaplist->bpf)))) {
+                PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setfilter()");
+                return PCAP_THREAD_EPCAP;
+            }
+        }
+
+        if ((snapshot = pcap_snapshot(pcaplist->pcap)) < 0) {
+            pcap_thread->status = snapshot;
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_snapshot()");
+            return PCAP_THREAD_EPCAP;
+        }
+        if (snapshot > pcap_thread->snapshot) {
+            pcap_thread->snapshot = snapshot;
+        }
+    }
 
     return PCAP_THREAD_OK;
 }
@@ -883,11 +905,14 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
         pcaplist = pcap_thread->pcaplist;
         pcap_thread->pcaplist = pcaplist->next;
 
-        if (pcaplist->name) {
-            free(pcaplist->name);
-        }
         if (pcaplist->pcap) {
             pcap_close(pcaplist->pcap);
+        }
+        if (pcaplist->have_bpf) {
+            pcap_freecode(&(pcaplist->bpf));
+        }
+        if (pcaplist->name) {
+            free(pcaplist->name);
         }
 #ifdef HAVE_PTHREAD
         if (pcaplist->queue) {
@@ -906,8 +931,6 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
     if (pcap_thread->filter) {
         free(pcap_thread->filter);
         pcap_thread->filter = 0;
-        pcap_freecode(&(pcap_thread->bpf));
-        memset(&(pcap_thread->bpf), 0, sizeof(struct bpf_program));
     }
 
     return PCAP_THREAD_OK;
@@ -1398,6 +1421,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                 packets = pcap_dispatch(pcaplist->pcap, -1, _callback2, (u_char*)pcaplist);
                 if (packets == -1) {
                     pcap_thread->status = -1;
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_dispatch()");
                     return PCAP_THREAD_EPCAP;
                 }
                 else if (packets == -2 || (pcaplist->is_offline && !packets)) {
@@ -1435,6 +1459,7 @@ int pcap_thread_next(pcap_thread_t* pcap_thread) {
 
     if (!(pkt = pcap_next(pcap_thread->step->pcap, &pkthdr))) {
         pcap_thread->status = -1;
+        PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_next()");
         return PCAP_THREAD_EPCAP;
     }
     pcap_thread->callback(pcap_thread->step->user, &pkthdr, pkt, pcap_thread->step->name, pcap_datalink(pcap_thread->step->pcap));
@@ -1505,9 +1530,14 @@ int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t c
         return PCAP_THREAD_NOPCAPS;
     }
 
+    if (pcap_thread->errbuf[0]) {
+        memset(pcap_thread->errbuf, 0, sizeof(pcap_thread->errbuf));
+    }
+    pcap_thread->status = 0;
+
     for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
         if ((pcap_thread->status = pcap_stats(pcaplist->pcap, &stats))) {
-            strncpy(pcap_thread->errbuf, pcap_geterr(pcaplist->pcap), sizeof(pcap_thread->errbuf) - 1);
+            PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_stats()");
             return PCAP_THREAD_EPCAP;
         }
         callback(user, &stats, pcaplist->name, pcap_datalink(pcaplist->pcap));
@@ -1560,6 +1590,8 @@ const char* pcap_thread_strerr(int error) {
             return PCAP_THREAD_ERRNO_STR;
         case PCAP_THREAD_NOYIELD:
             return PCAP_THREAD_NOYIELD_STR;
+        case PCAP_THREAD_EOBSOLETE:
+            return PCAP_THREAD_EOBSOLETE_STR;
     }
     return "UNKNOWN";
 }

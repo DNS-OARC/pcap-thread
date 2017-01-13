@@ -80,6 +80,7 @@ extern "C" {
 #define PCAP_THREAD_NOCALLBACK      8
 #define PCAP_THREAD_ERRNO           9
 #define PCAP_THREAD_NOYIELD         10
+#define PCAP_THREAD_EOBSOLETE       11
 
 #define PCAP_THREAD_EPCAP_STR       "libpcap error"
 #define PCAP_THREAD_ENOMEM_STR      "out of memory"
@@ -91,6 +92,7 @@ extern "C" {
 #define PCAP_THREAD_NOCALLBACK_STR  "no callback set"
 #define PCAP_THREAD_ERRNO_STR       "system error, check errno"
 #define PCAP_THREAD_NOYIELD_STR     "queue more yield requested but not supported"
+#define PCAP_THREAD_EOBSOLETE_STR   "obsolete function or feature"
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
@@ -133,16 +135,21 @@ enum pcap_thread_activate_mode {
 #endif
 
 #define PCAP_THREAD_T_INIT { \
+    0, 0, 0, \
     1, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_WAIT, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT, PCAP_THREAD_T_INIT_QUEUE \
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
-    0, -1, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
-    0, 0, { 0, 0 }, 1, PCAP_NETMASK_UNKNOWN, \
+    0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, PCAP_THREAD_T_INIT_DIRECTION_T \
+    0, 0, 1, PCAP_NETMASK_UNKNOWN, \
     PCAP_THREAD_DEFAULT_QUEUE_SIZE, 0, 0, \
     0, "", 0, 0, { 0, 0 }, \
     PCAP_THREAD_DEFAULT_ACTIVATE_MODE \
 }
 
 struct pcap_thread {
+    unsigned short      have_timestamp_precision : 1;
+    unsigned short      have_timestamp_type : 1;
+    unsigned short      have_direction : 1;
+
     int                         use_threads;
     pcap_thread_queue_mode_t    queue_mode;
     struct timeval              queue_wait;
@@ -170,7 +177,6 @@ struct pcap_thread {
 
     char*                   filter;
     size_t                  filter_len;
-    struct bpf_program      bpf;
     int                     filter_optimize;
     bpf_u_int32             filter_netmask;
 
@@ -192,18 +198,22 @@ struct pcap_thread {
 
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
+    0, \
     0, 0, 0, 0, 0, 0, \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, PTHREAD_COND_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_MODE, PCAP_THREAD_DEFAULT_CALLBACK_QUEUE_WAIT, 0, \
-    0 \
+    0, { 0, 0 } \
 }
 #else
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
+    0, \
     0, 0, 0, 0, 0, 0, \
-    0 \
+    0, { 0, 0 } \
 }
 #endif
 
 struct pcap_thread_pcaplist {
+    unsigned short          have_bpf : 1;
+
     pcap_thread_pcaplist_t* next;
     char*                   name;
     pcap_t*                 pcap;
@@ -230,6 +240,7 @@ struct pcap_thread_pcaplist {
     int                         callback_queue_full;
 #endif
     pcap_thread_callback_t  callback;
+    struct bpf_program      bpf;
 };
 
 const char* pcap_thread_version_str(void);
