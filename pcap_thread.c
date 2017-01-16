@@ -359,7 +359,7 @@ pcap_direction_t pcap_thread_direction(const pcap_thread_t* pcap_thread) {
 #endif
 }
 
-int pcap_thread_set_direction(pcap_thread_t* pcap_thread, pcap_direction_t direction) {
+int pcap_thread_set_direction(pcap_thread_t* pcap_thread, const pcap_direction_t direction) {
 #ifdef HAVE_PCAP_DIRECTION_T
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
@@ -460,7 +460,7 @@ struct timeval pcap_thread_timedrun(const pcap_thread_t* pcap_thread) {
     return pcap_thread->timedrun;
 }
 
-int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun) {
+int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, const struct timeval timedrun) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
@@ -469,6 +469,28 @@ int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun
     }
 
     pcap_thread->timedrun = timedrun;
+
+    return PCAP_THREAD_OK;
+}
+
+struct timeval pcap_thread_timedrun_to(const pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        static struct timeval tv = { 0, 0 };
+        return tv;
+    }
+
+    return pcap_thread->timedrun_to;
+}
+
+int pcap_thread_set_timedrun_to(pcap_thread_t* pcap_thread, const struct timeval timedrun_to) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->timedrun_to = timedrun_to;
 
     return PCAP_THREAD_OK;
 }
@@ -1126,6 +1148,12 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         end.tv_sec = start.tv_sec + pcap_thread->timedrun.tv_sec
             + ( ( start.tv_usec + pcap_thread->timedrun.tv_usec ) / 1000000 );
         end.tv_nsec = ( ( start.tv_usec + pcap_thread->timedrun.tv_usec ) % 1000000 ) * 1000;
+    }
+    else if (pcap_thread->timedrun_to.tv_sec) {
+        timedrun = 1;
+
+        end.tv_sec = pcap_thread->timedrun_to.tv_sec;
+        end.tv_nsec = pcap_thread->timedrun_to.tv_usec * 1000;
     }
 
 #ifdef HAVE_PTHREAD

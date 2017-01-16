@@ -138,7 +138,7 @@ enum pcap_thread_activate_mode {
     0, 0, 1, PCAP_NETMASK_UNKNOWN, \
     0, 0, \
     0, "", 0, 0, \
-    { 0, 0 }, \
+    { 0, 0 }, { 0, 0 }, \
     PCAP_THREAD_DEFAULT_ACTIVATE_MODE \
 }
 
@@ -194,6 +194,7 @@ struct pcap_thread {
     pcap_thread_pcaplist_t*     step;
 
     struct timeval              timedrun;
+    struct timeval              timedrun_to;
 
     pcap_thread_activate_mode_t activate_mode;
 };
@@ -269,7 +270,7 @@ int pcap_thread_set_timestamp_precision(pcap_thread_t* pcap_thread, const int ti
 int pcap_thread_immediate_mode(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_immediate_mode(pcap_thread_t* pcap_thread, const int immediate_mode);
 pcap_direction_t pcap_thread_direction(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_direction(pcap_thread_t* pcap_thread, pcap_direction_t direction);
+int pcap_thread_set_direction(pcap_thread_t* pcap_thread, const pcap_direction_t direction);
 const char* pcap_thread_filter(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const size_t filter_len);
 int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread);
@@ -277,7 +278,9 @@ int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter
 bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask);
 struct timeval pcap_thread_timedrun(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, struct timeval timedrun);
+int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, const struct timeval timedrun);
+struct timeval pcap_thread_timedrun_to(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_timedrun_to(pcap_thread_t* pcap_thread, const struct timeval timedrun_to);
 pcap_thread_activate_mode_t pcap_thread_activate_mode(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_activate_mode(pcap_thread_t* pcap_thread, const pcap_thread_activate_mode_t activate_mode);
 
