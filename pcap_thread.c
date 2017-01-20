@@ -129,6 +129,7 @@ int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_que
 
     switch (queue_mode) {
         case PCAP_THREAD_QUEUE_MODE_COND:
+        case PCAP_THREAD_QUEUE_MODE_DIRECT:
             break;
         case PCAP_THREAD_QUEUE_MODE_YIELD:
         case PCAP_THREAD_QUEUE_MODE_WAIT:
@@ -1015,6 +1016,16 @@ static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_ch
         return;
     }
 
+    if (pcap_thread->queue_mode == PCAP_THREAD_QUEUE_MODE_DIRECT) {
+        if (pcap_thread->callback) {
+            pcap_thread->callback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+        }
+        else if (pcap_thread->dropback) {
+            pcap_thread->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+        }
+        return;
+    }
+
     if (pthread_mutex_lock(&(pcap_thread->mutex))) {
         if (pcap_thread->dropback) {
             pcap_thread->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
@@ -1162,6 +1173,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
 
         switch (pcap_thread->queue_mode) {
             case PCAP_THREAD_QUEUE_MODE_COND:
+            case PCAP_THREAD_QUEUE_MODE_DIRECT:
                 if ((err = pthread_mutex_lock(&(pcap_thread->mutex)))) {
                     errno = err;
                     PCAP_THREAD_SET_ERRBUF(pcap_thread, "pthread_mutex_lock()");
