@@ -158,6 +158,8 @@ int main(int argc, char** argv) {
                 ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_WAIT);
             else if (!strcmp("yield", optarg))
                 ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_YIELD);
+            else if (!strcmp("direct", optarg))
+                ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_DIRECT);
             else
                 err = -1;
             break;
