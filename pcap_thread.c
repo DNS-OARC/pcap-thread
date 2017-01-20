@@ -1548,6 +1548,8 @@ int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t c
     pcap_thread->status = 0;
 
     for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+        if (pcaplist->is_offline)
+            continue;
         if ((pcap_thread->status = pcap_stats(pcaplist->pcap, &stats))) {
             PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_stats()");
             return PCAP_THREAD_EPCAP;
