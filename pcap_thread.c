@@ -410,6 +410,14 @@ int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const
     return PCAP_THREAD_OK;
 }
 
+int pcap_thread_filter_errno(const pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->filter_errno;
+}
+
 int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread) {
     if (!pcap_thread) {
         return -1;
@@ -735,6 +743,8 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
                 return PCAP_THREAD_EPCAP;
             }
             pcaplist->have_bpf = 1;
+            pcap_thread->filter_errno = 0;
+            errno = 0;
             if ((pcap_thread->status = pcap_setfilter(pcap, &(pcaplist->bpf)))) {
                 pcap_freecode(&(pcaplist->bpf));
                 pcap_close(pcap);
@@ -743,6 +753,7 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
                 PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setfilter()");
                 return PCAP_THREAD_EPCAP;
             }
+            pcap_thread->filter_errno = errno;
         }
 
         if ((snapshot = pcap_snapshot(pcap)) < 0) {
@@ -827,6 +838,8 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
             return PCAP_THREAD_EPCAP;
         }
         pcaplist->have_bpf = 1;
+        pcap_thread->filter_errno = 0;
+        errno = 0;
         if ((pcap_thread->status = pcap_setfilter(pcap, &(pcaplist->bpf)))) {
             pcap_freecode(&(pcaplist->bpf));
             pcap_close(pcap);
@@ -835,6 +848,7 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
             PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setfilter()");
             return PCAP_THREAD_EPCAP;
         }
+        pcap_thread->filter_errno = errno;
     }
 
     if ((snapshot = pcap_snapshot(pcap)) < 0) {
@@ -891,6 +905,7 @@ int pcap_thread_activate(pcap_thread_t* pcap_thread) {
     }
     pcap_thread->status = 0;
 
+    pcap_thread->filter_errno = 0;
     for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
         if (pcaplist->is_offline) {
             continue;
@@ -920,10 +935,13 @@ int pcap_thread_activate(pcap_thread_t* pcap_thread) {
                 return PCAP_THREAD_EPCAP;
             }
             pcaplist->have_bpf = 1;
+            errno = 0;
             if ((pcap_thread->status = pcap_setfilter(pcaplist->pcap, &(pcaplist->bpf)))) {
                 PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_setfilter()");
                 return PCAP_THREAD_EPCAP;
             }
+            if (errno && !pcap_thread->filter_errno)
+                pcap_thread->filter_errno = errno;
         }
 
         if ((snapshot = pcap_snapshot(pcaplist->pcap)) < 0) {
