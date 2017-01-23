@@ -136,7 +136,7 @@ enum pcap_thread_activate_mode {
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
     0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, \
     PCAP_THREAD_T_INIT_DIRECTION_T \
-    0, 0, 1, PCAP_NETMASK_UNKNOWN, \
+    0, 0, 0, 1, PCAP_NETMASK_UNKNOWN, \
     0, 0, \
     0, "", 0, 0, \
     { 0, 0 }, { 0, 0 }, \
@@ -183,6 +183,7 @@ struct pcap_thread {
 
     char*                       filter;
     size_t                      filter_len;
+    int                         filter_errno;
     int                         filter_optimize;
     bpf_u_int32                 filter_netmask;
 
@@ -274,6 +275,7 @@ pcap_direction_t pcap_thread_direction(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_direction(pcap_thread_t* pcap_thread, const pcap_direction_t direction);
 const char* pcap_thread_filter(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const size_t filter_len);
+int pcap_thread_filter_errno(const pcap_thread_t* pcap_thread);
 int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter_optimize);
 bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);

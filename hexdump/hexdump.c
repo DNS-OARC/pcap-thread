@@ -109,7 +109,7 @@ void stop(int signum) {
 }
 
 #define MAX_INTERFACES 64
-#define MAX_FILTER_SIZE 4096
+#define MAX_FILTER_SIZE 64*1024
 
 int do_next(int cnt) {
     int ret;
@@ -452,12 +452,18 @@ int main(int argc, char** argv) {
                     fprintf(stderr, "file:%s ", interfaces[i]);
                     break;
                 }
+                if (pcap_thread_filter_errno(&pt)) {
+                    printf("non-fatal filter errno [%d]: %s\n", pcap_thread_filter_errno(&pt), strerror(pcap_thread_filter_errno(&pt)));
+                }
             }
             else {
                 if (verbose) printf("interface: %s\n", interfaces[i]);
                 if ((ret = pcap_thread_open(&pt, interfaces[i], verbose ? (u_char*)1 : 0))) {
                     fprintf(stderr, "interface:%s ", interfaces[i]);
                     break;
+                }
+                if (pcap_thread_filter_errno(&pt)) {
+                    printf("non-fatal filter errno [%d]: %s\n", pcap_thread_filter_errno(&pt), strerror(pcap_thread_filter_errno(&pt)));
                 }
             }
         }
@@ -477,6 +483,10 @@ int main(int argc, char** argv) {
             fprintf(stderr, "stats ");
         else if (!ret && (ret = pcap_thread_close(&pt)))
             fprintf(stderr, "close ");
+
+        if (pcap_thread_activate_mode(&pt) == PCAP_THREAD_ACTIVATE_MODE_DELAYED && pcap_thread_filter_errno(&pt)) {
+            printf("non-fatal filter errno [%d]: %s\n", pcap_thread_filter_errno(&pt), strerror(pcap_thread_filter_errno(&pt)));
+        }
     }
 
     if (ret == PCAP_THREAD_EPCAP) {
