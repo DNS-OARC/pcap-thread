@@ -1,3 +1,63 @@
+2017-01-23 Jerry Lundström
+
+    Release pcap-thread 2.0.0, hexdump 1.2.0
+
+    Reworked queues from being "lockless" to using one mutex, two conditions
+    and use only one queue per context instead of one per interface.
+    Deprecated most queue modes, all callback queue modes and obsoleted
+    `pcap_thread_add()`.
+
+    Fixes and tweaks:
+    - Use bitmaps internally in structures to allow for setting values to
+      zero (as some are enums with valid zero values) for:
+      - `pcap_thread_set_timestamp_precision()`
+      - `pcap_thread_set_timestamp_type()`
+      - `pcap_thread_set_direction()`
+    - Memory leaks
+    - Clear and fill errbuf everywhere it should be done
+    - Handle errors from `pcap_snapshot()`
+    - Protect against changing anything while running
+    - Don't run `pcap_stats()` on offline pcaps since it will return an error
+    - Rearrange booleans in `hexdump` output to make more sense.
+
+    New features:
+    - Delayed activation of pcap capturing can be done by setting
+      `PCAP_THREAD_ACTIVATE_MODE_DELAYED` with
+      `pcap_thread_set_activate_mode()` and then calling
+      `pcap_thread_activate()` before processing packets.
+    - `pcap_thread_timedrun_to()` can be used to process packet until an
+      absolute time.
+    - `PCAP_THREAD_QUEUE_MODE_DIRECT` can be used to run the callback within
+      the capturing threads and in so with-go of the queue and increase the
+      performance.
+    - `pcap_thread_filter_errno()` can be used to get the non-fatal error
+      from setting the pcap bpf, if there is an error it can indicate that
+      the bpf was too large or there is no support for it. This will also
+      mean that libpcap will run it in userland and it may be a lot slower
+      then if it ran in the kernel.
+    - New option `-a <0|1>` for `hexdump` to use delayed activation.
+    - New queue mode `direct` for `hexdump` (`-C <mode>`) to use process
+      packets in the capture thread.
+
+    60fbeb7 Tab to spaces
+    1161efa Remove lockless and update help
+    e88f035 Detect if errno was set during open or activate but libpcap did
+            not return error, this indicates filter may be running userland
+            (which is A LOT slower)
+    1f4a329 Don't run pcap_stats() on offline pcaps, will just return error
+    814524d Implement direct queue mode, will send packets to callback in
+            the capturing thread
+    4c7195f Timed run to
+    200bb11 Reattach threads and join them
+    3fd399a Notify that _thread have existed
+    e3a0b92 Prevent changes if we are running
+    df86684 Simplify thread queue
+    29ef49e Tweaks and fixes
+    355e761 If we don't have pcap_activate() then it is already activated
+    ab8bb9a Rearrange bools for hexdump options to correspond with help text
+    f5e79e4 Implement the possibility for delayed activation of the interface
+            capturing
+
 2017-01-12 Jerry Lundström
 
     Release 1.2.3

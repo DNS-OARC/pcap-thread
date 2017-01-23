@@ -109,7 +109,7 @@ void stop(int signum) {
 }
 
 #define MAX_INTERFACES 64
-#define MAX_FILTER_SIZE 4096
+#define MAX_FILTER_SIZE 64*1024
 
 int do_next(int cnt) {
     int ret;
@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
         exit(4);
     }
 
-    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:vr:H:P:hDVA:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:a:vr:H:P:hDVA:c:")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -158,6 +158,8 @@ int main(int argc, char** argv) {
                 ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_WAIT);
             else if (!strcmp("yield", optarg))
                 ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_YIELD);
+            else if (!strcmp("direct", optarg))
+                ret = pcap_thread_set_queue_mode(&pt, PCAP_THREAD_QUEUE_MODE_DIRECT);
             else
                 err = -1;
             break;
@@ -251,6 +253,10 @@ int main(int argc, char** argv) {
                 ret = pcap_thread_set_queue_wait(&pt, t);
             }
             break;
+        case 'a':
+            if (atoi(optarg))
+                pcap_thread_set_activate_mode(&pt, PCAP_THREAD_ACTIVATE_MODE_DELAYED);
+            break;
         case 'v':
             verbose = 1;
             break;
@@ -289,22 +295,23 @@ int main(int argc, char** argv) {
 "usage: hexdump [options] [filter]\n"
 " -A <secs>          exit after a number of seconds\n"
 " -c <count>         process count packets then exit\n"
-" -T <0|1>           use/not use threads\n"
+" -T <1|0>           use/not use threads\n"
 " -M <mode>          queue mode: cond, wait or yield\n"
-" -C <mode>          callback queue mode: cond, drop, wait or yield\n"
+" -C <mode>          callback queue mode: cond, drop, wait, yield or direct\n"
 " -s <len>           snap length\n"
-" -p <0|1>           use/not use promiscuous mode\n"
-" -m <0|1>           use/not use monitor mode\n"
+" -p <1|0>           use/not use promiscuous mode\n"
+" -m <1|0>           use/not use monitor mode\n"
 " -t <ms>            timeout\n"
 " -b <bytes>         buffer size\n"
-" -I <0|1>           use/not use immediate mode\n"
+" -I <1|0>           use/not use immediate mode\n"
 " -d <dir>           direction: in, out or inout\n"
-" -o <0|1>           use/not use filter optimization\n"
+" -o <1|0>           use/not use filter optimization\n"
 " -n <mask>          filter netmask\n"
 " -S <size>          queue size\n"
 " -i <name>          interface (multiple)\n"
 " -r <file>          pcap savefile (multiple)\n"
 " -W <usec>          queue wait\n"
+" -a <1|0>           use/not use delayed activation of interface capturing\n"
 " -v                 verbose\n"
 #ifdef HAVE_PCAP_SET_TSTAMP_TYPE
 " -H <type>          timestamp type: host, host_lowprec, host_hiprec, adapter\n"
@@ -445,12 +452,18 @@ int main(int argc, char** argv) {
                     fprintf(stderr, "file:%s ", interfaces[i]);
                     break;
                 }
+                if (pcap_thread_filter_errno(&pt)) {
+                    printf("non-fatal filter errno [%d]: %s\n", pcap_thread_filter_errno(&pt), strerror(pcap_thread_filter_errno(&pt)));
+                }
             }
             else {
                 if (verbose) printf("interface: %s\n", interfaces[i]);
                 if ((ret = pcap_thread_open(&pt, interfaces[i], verbose ? (u_char*)1 : 0))) {
                     fprintf(stderr, "interface:%s ", interfaces[i]);
                     break;
+                }
+                if (pcap_thread_filter_errno(&pt)) {
+                    printf("non-fatal filter errno [%d]: %s\n", pcap_thread_filter_errno(&pt), strerror(pcap_thread_filter_errno(&pt)));
                 }
             }
         }
@@ -462,12 +475,18 @@ int main(int argc, char** argv) {
             fprintf(stderr, "open ");
         else if (cnt && (ret = do_next(cnt)))
             fprintf(stderr, "next ");
+        else if (!cnt && pcap_thread_activate_mode(&pt) == PCAP_THREAD_ACTIVATE_MODE_DELAYED && (ret = pcap_thread_activate(&pt)))
+            fprintf(stderr, "activate ");
         else if (!cnt && (ret = pcap_thread_run(&pt)))
             fprintf(stderr, "run ");
         else if (stats && (ret = pcap_thread_stats(&pt, stat_callback, verbose ? (u_char*)1 : 0)))
             fprintf(stderr, "stats ");
         else if (!ret && (ret = pcap_thread_close(&pt)))
             fprintf(stderr, "close ");
+
+        if (pcap_thread_activate_mode(&pt) == PCAP_THREAD_ACTIVATE_MODE_DELAYED && pcap_thread_filter_errno(&pt)) {
+            printf("non-fatal filter errno [%d]: %s\n", pcap_thread_filter_errno(&pt), strerror(pcap_thread_filter_errno(&pt)));
+        }
     }
 
     if (ret == PCAP_THREAD_EPCAP) {
