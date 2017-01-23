@@ -191,7 +191,7 @@ struct pcap_thread {
     pcap_thread_callback_t      dropback;
 
     int                         status;
-	char                        errbuf[PCAP_ERRBUF_SIZE];
+    char                        errbuf[PCAP_ERRBUF_SIZE];
     pcap_thread_pcaplist_t*     pcaplist;
     pcap_thread_pcaplist_t*     step;
 
