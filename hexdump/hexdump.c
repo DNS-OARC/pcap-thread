@@ -297,7 +297,7 @@ int main(int argc, char** argv) {
 " -c <count>         process count packets then exit\n"
 " -T <1|0>           use/not use threads\n"
 " -M <mode>          queue mode: cond, wait or yield\n"
-" -C <mode>          callback queue mode: cond, drop, wait or yield\n"
+" -C <mode>          callback queue mode: cond, drop, wait, yield or direct\n"
 " -s <len>           snap length\n"
 " -p <1|0>           use/not use promiscuous mode\n"
 " -m <1|0>           use/not use monitor mode\n"

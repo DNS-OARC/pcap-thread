@@ -8,8 +8,8 @@ PCAP helper library with POSIX threads support
 
 This is a helper library that will initialize the `pcap_t` for you and,
 if you have support, launch a thread per `pcap_t` for the collection which
-is then feeded back to the main thread using a lockless queue before being
-passed on to the callback.
+is then feeded back to the main thread using a queue before being passed on
+to the callback.
 
 ## Usage
 

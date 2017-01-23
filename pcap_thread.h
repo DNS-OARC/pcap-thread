@@ -48,10 +48,10 @@
 extern "C" {
 #endif
 
-#define PCAP_THREAD_VERSION_STR     "1.2.3"
-#define PCAP_THREAD_VERSION_MAJOR   1
-#define PCAP_THREAD_VERSION_MINOR   2
-#define PCAP_THREAD_VERSION_PATCH   3
+#define PCAP_THREAD_VERSION_STR     "2.0.0"
+#define PCAP_THREAD_VERSION_MAJOR   2
+#define PCAP_THREAD_VERSION_MINOR   0
+#define PCAP_THREAD_VERSION_PATCH   0
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT     1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE  64
@@ -191,7 +191,7 @@ struct pcap_thread {
     pcap_thread_callback_t      dropback;
 
     int                         status;
-	char                        errbuf[PCAP_ERRBUF_SIZE];
+    char                        errbuf[PCAP_ERRBUF_SIZE];
     pcap_thread_pcaplist_t*     pcaplist;
     pcap_thread_pcaplist_t*     step;
 
