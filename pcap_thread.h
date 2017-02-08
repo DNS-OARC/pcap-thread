@@ -40,9 +40,20 @@
 #include <pthread.h>
 #endif
 
+#ifndef __FAVOR_BSD
+#define __FAVOR_BSD 1 /* Needed for old headers on CentOS 7 to get right structs for UDP and TCP */
+#endif
 #include <pcap/pcap.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <net/if_arp.h>
+#include <netinet/if_ether.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/udp.h>
+#include <netinet/tcp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,6 +83,7 @@ extern "C" {
 #define PCAP_THREAD_EOBSOLETE       11
 #define PCAP_THREAD_ERUNNING        12
 #define PCAP_THREAD_ENOPCAPLIST     13
+#define PCAP_THREAD_ELAYERCB        14
 
 #define PCAP_THREAD_EPCAP_STR       "libpcap error"
 #define PCAP_THREAD_ENOMEM_STR      "out of memory"
@@ -86,10 +98,85 @@ extern "C" {
 #define PCAP_THREAD_EOBSOLETE_STR   "obsolete function or feature"
 #define PCAP_THREAD_ERUNNING_STR    "pcap thread are running, can not complete task"
 #define PCAP_THREAD_ENOPCAPLIST_STR "no internal reference to the pcap that captured the packet"
+#define PCAP_THREAD_ELAYERCB_STR    "layer callback already set in lower or higher segment"
+
+struct pcap_thread_null_hdr {
+    uint32_t    family;
+};
+struct pcap_thread_loop_hdr {
+    uint32_t    family;
+};
+struct pcap_thread_ieee802_hdr {
+    uint16_t        tpid;
+    unsigned short  pcp : 3;
+    unsigned short  dei : 1;
+    unsigned short  vid : 12;
+    uint16_t        ether_type;
+};
+struct pcap_thread_gre_hdr {
+    uint16_t    gre_flags;
+    uint16_t    ether_type;
+};
+struct pcap_thread_gre {
+    uint16_t    checksum;
+    uint16_t    key;
+    uint16_t    sequence;
+};
+enum pcap_thread_packet_state {
+    PCAP_THREAD_PACKET_OK = 0,
+    PCAP_THREAD_PACKET_INVALID,
+    PCAP_THREAD_PACKET_UNSUPPORTED,
+    PCAP_THREAD_PACKET_UNPROCESSED,
+    PCAP_THREAD_PACKET_INVALID_ETHER,
+    PCAP_THREAD_PACKET_INVALID_NULL,
+    PCAP_THREAD_PACKET_INVALID_LOOP,
+    PCAP_THREAD_PACKET_INVALID_IEEE802,
+    PCAP_THREAD_PACKET_INVALID_GRE,
+    PCAP_THREAD_PACKET_INVALID_IP,
+    PCAP_THREAD_PACKET_INVALID_IPV4,
+    PCAP_THREAD_PACKET_INVALID_IPV6,
+    PCAP_THREAD_PACKET_INVALID_IPV6HDR,
+    PCAP_THREAD_PACKET_INVALID_UDP,
+    PCAP_THREAD_PACKET_INVALID_TCP
+};
+
+typedef struct pcap_thread_packet pcap_thread_packet_t;
+struct pcap_thread_packet {
+    unsigned short  have_prevpkt : 1;
+    unsigned short  have_pkthdr : 1;
+    unsigned short  have_ethhdr : 1;
+    unsigned short  have_nullhdr : 1;
+    unsigned short  have_loophdr : 1;
+    unsigned short  have_ieee802hdr : 1;
+    unsigned short  have_grehdr : 1;
+    unsigned short  have_gre : 1;
+    unsigned short  have_iphdr : 1;
+    unsigned short  have_ip6hdr : 1;
+    unsigned short  have_udphdr : 1;
+    unsigned short  have_tcphdr : 1;
+
+    const char*                     name;
+    int                             dlt;
+    pcap_thread_packet_t*           prevpkt;
+    struct pcap_pkthdr              pkthdr;
+    struct ether_header             ethhdr;
+    struct pcap_thread_null_hdr     nullhdr;
+    struct pcap_thread_loop_hdr     loophdr;
+    struct pcap_thread_ieee802_hdr  ieee802hdr;
+    struct pcap_thread_gre_hdr      grehdr;
+    struct pcap_thread_gre          gre;
+    struct ip                       iphdr;
+    struct ip6_hdr                  ip6hdr;
+    struct udphdr                   udphdr;
+    struct tcphdr                   tcphdr;
+
+    enum pcap_thread_packet_state   state;
+};
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread pcap_thread_t;
 typedef void (*pcap_thread_callback_t)(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt);
+typedef void (*pcap_thread_layer_callback_t)(u_char* user, const pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 typedef void (*pcap_thread_stats_callback_t)(u_char* user, const struct pcap_stat* stats, const char* name, int dlt);
 #ifndef HAVE_PCAP_DIRECTION_T
 typedef int pcap_direction_t;
@@ -131,7 +218,7 @@ enum pcap_thread_activate_mode {
 
 #define PCAP_THREAD_T_INIT { \
     0, 0, 0, \
-    0, 1, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_SIZE, \
+    0, 1, 0, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_SIZE, \
     PCAP_THREAD_T_INIT_QUEUE \
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
     0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, \
@@ -140,7 +227,9 @@ enum pcap_thread_activate_mode {
     0, 0, \
     0, "", 0, 0, \
     { 0, 0 }, { 0, 0 }, \
-    PCAP_THREAD_DEFAULT_ACTIVATE_MODE \
+    PCAP_THREAD_DEFAULT_ACTIVATE_MODE, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+    0 \
 }
 
 struct pcap_thread {
@@ -150,6 +239,7 @@ struct pcap_thread {
 
     int                         running;
     int                         use_threads;
+    int                         use_layers;
     pcap_thread_queue_mode_t    queue_mode;
     size_t                      queue_size;
 
@@ -199,6 +289,19 @@ struct pcap_thread {
     struct timeval              timedrun_to;
 
     pcap_thread_activate_mode_t activate_mode;
+
+    pcap_thread_layer_callback_t    callback_ether;
+    pcap_thread_layer_callback_t    callback_null;
+    pcap_thread_layer_callback_t    callback_loop;
+    pcap_thread_layer_callback_t    callback_ieee802;
+    pcap_thread_layer_callback_t    callback_gre;
+    pcap_thread_layer_callback_t    callback_ip;
+    pcap_thread_layer_callback_t    callback_ipv4;
+    pcap_thread_layer_callback_t    callback_ipv6;
+    pcap_thread_layer_callback_t    callback_udp;
+    pcap_thread_layer_callback_t    callback_tcp;
+
+    pcap_thread_layer_callback_t    callback_invalid;
 };
 
 #define PCAP_THREAD_SET_ERRBUF(x, y) strncpy(x->errbuf, y, sizeof(x->errbuf) - 1)
@@ -214,7 +317,8 @@ struct pcap_thread {
     0, 0, 0, 0, 0, 0, \
     0, \
     PCAP_THREAD_PCAPLIST_T_INIT_THREAD \
-    { 0, 0 } \
+    { 0, 0 }, \
+    0 \
 }
 
 struct pcap_thread_pcaplist {
@@ -234,6 +338,8 @@ struct pcap_thread_pcaplist {
 #endif
 
     struct bpf_program      bpf;
+
+    pcap_thread_callback_t  layer_callback;
 };
 
 const char* pcap_thread_version_str(void);
@@ -246,6 +352,8 @@ void pcap_thread_free(pcap_thread_t* pcap_thread);
 
 int pcap_thread_use_threads(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_use_threads(pcap_thread_t* pcap_thread, const int use_threads);
+int pcap_thread_use_layers(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_use_layers(pcap_thread_t* pcap_thread, const int use_layers);
 pcap_thread_queue_mode_t pcap_thread_queue_mode(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t queue_mode);
 struct timeval pcap_thread_queue_wait(const pcap_thread_t* pcap_thread);
@@ -292,6 +400,18 @@ int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_si
 
 int pcap_thread_set_callback(pcap_thread_t* pcap_thread, pcap_thread_callback_t callback);
 int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t dropback);
+
+int pcap_thread_set_callback_ether(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ether);
+int pcap_thread_set_callback_null(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_null);
+int pcap_thread_set_callback_loop(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_loop);
+int pcap_thread_set_callback_ieee802(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ieee802);
+int pcap_thread_set_callback_gre(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_gre);
+int pcap_thread_set_callback_ip(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ip);
+int pcap_thread_set_callback_ipv4(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv4);
+int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv6);
+int pcap_thread_set_callback_udp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_udp);
+int pcap_thread_set_callback_tcp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_tcp);
+int pcap_thread_set_callback_invalid(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_tcp);
 
 int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void* user);
 int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user);
