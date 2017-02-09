@@ -100,6 +100,13 @@ extern "C" {
 #define PCAP_THREAD_ENOPCAPLIST_STR "no internal reference to the pcap that captured the packet"
 #define PCAP_THREAD_ELAYERCB_STR    "layer callback already set in lower or higher segment"
 
+struct pcap_thread_linux_sll {
+    uint16_t    packet_type;
+    uint16_t    arp_hardware;
+    uint16_t    link_layer_address_length;
+    uint8_t     link_layer_address[8];
+    uint16_t    ether_type;
+};
 struct pcap_thread_null_hdr {
     uint32_t    family;
 };
@@ -128,6 +135,7 @@ enum pcap_thread_packet_state {
     PCAP_THREAD_PACKET_UNSUPPORTED,
     PCAP_THREAD_PACKET_UNPROCESSED,
     PCAP_THREAD_PACKET_INVALID_ETHER,
+    PCAP_THREAD_PACKET_INVALID_LINUX_SLL,
     PCAP_THREAD_PACKET_INVALID_NULL,
     PCAP_THREAD_PACKET_INVALID_LOOP,
     PCAP_THREAD_PACKET_INVALID_IEEE802,
@@ -144,6 +152,7 @@ typedef struct pcap_thread_packet pcap_thread_packet_t;
 struct pcap_thread_packet {
     unsigned short  have_prevpkt : 1;
     unsigned short  have_pkthdr : 1;
+    unsigned short  have_linux_sll : 1;
     unsigned short  have_ethhdr : 1;
     unsigned short  have_nullhdr : 1;
     unsigned short  have_loophdr : 1;
@@ -159,6 +168,7 @@ struct pcap_thread_packet {
     int                             dlt;
     pcap_thread_packet_t*           prevpkt;
     struct pcap_pkthdr              pkthdr;
+    struct pcap_thread_linux_sll    linux_sll;
     struct ether_header             ethhdr;
     struct pcap_thread_null_hdr     nullhdr;
     struct pcap_thread_loop_hdr     loophdr;
@@ -228,7 +238,7 @@ enum pcap_thread_activate_mode {
     0, "", 0, 0, \
     { 0, 0 }, { 0, 0 }, \
     PCAP_THREAD_DEFAULT_ACTIVATE_MODE, \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0 \
 }
 
@@ -290,6 +300,7 @@ struct pcap_thread {
 
     pcap_thread_activate_mode_t activate_mode;
 
+    pcap_thread_layer_callback_t    callback_linux_sll;
     pcap_thread_layer_callback_t    callback_ether;
     pcap_thread_layer_callback_t    callback_null;
     pcap_thread_layer_callback_t    callback_loop;
@@ -401,6 +412,7 @@ int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_si
 int pcap_thread_set_callback(pcap_thread_t* pcap_thread, pcap_thread_callback_t callback);
 int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t dropback);
 
+int pcap_thread_set_callback_linux_sll(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_linux_sll);
 int pcap_thread_set_callback_ether(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ether);
 int pcap_thread_set_callback_null(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_null);
 int pcap_thread_set_callback_loop(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_loop);
