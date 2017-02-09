@@ -73,6 +73,7 @@
  */
 
 static void pcap_thread_callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt);
+static void pcap_thread_callback_linux_sll(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_ether(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_null(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_loop(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
@@ -648,11 +649,38 @@ int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
  * Layers
  */
 
+int pcap_thread_set_callback_linux_sll(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_linux_sll) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_linux_sll = callback_linux_sll;
+
+    return PCAP_THREAD_OK;
+}
+
 int pcap_thread_set_callback_ether(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ether) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_null
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_null
         || pcap_thread->callback_loop
         || pcap_thread->callback_ieee802
         || pcap_thread->callback_gre
@@ -677,7 +705,8 @@ int pcap_thread_set_callback_null(pcap_thread_t* pcap_thread, pcap_thread_layer_
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_loop
         || pcap_thread->callback_ieee802
         || pcap_thread->callback_gre
@@ -702,7 +731,8 @@ int pcap_thread_set_callback_loop(pcap_thread_t* pcap_thread, pcap_thread_layer_
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_null
         || pcap_thread->callback_ieee802
         || pcap_thread->callback_gre
@@ -727,7 +757,8 @@ int pcap_thread_set_callback_ieee802(pcap_thread_t* pcap_thread, pcap_thread_lay
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_null
         || pcap_thread->callback_loop
         || pcap_thread->callback_gre
@@ -752,7 +783,8 @@ int pcap_thread_set_callback_gre(pcap_thread_t* pcap_thread, pcap_thread_layer_c
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_null
         || pcap_thread->callback_loop
         || pcap_thread->callback_ieee802
@@ -777,7 +809,8 @@ int pcap_thread_set_callback_ip(pcap_thread_t* pcap_thread, pcap_thread_layer_ca
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_null
         || pcap_thread->callback_loop
         || pcap_thread->callback_ieee802
@@ -802,7 +835,8 @@ int pcap_thread_set_callback_ipv4(pcap_thread_t* pcap_thread, pcap_thread_layer_
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_null
         || pcap_thread->callback_loop
         || pcap_thread->callback_ieee802
@@ -827,7 +861,8 @@ int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_
    if (!pcap_thread) {
        return PCAP_THREAD_EINVAL;
    }
-   if (pcap_thread->callback_ether
+   if (pcap_thread->callback_linux_sll
+       || pcap_thread->callback_ether
        || pcap_thread->callback_null
        || pcap_thread->callback_loop
        || pcap_thread->callback_ieee802
@@ -851,7 +886,8 @@ int pcap_thread_set_callback_udp(pcap_thread_t* pcap_thread, pcap_thread_layer_c
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_null
         || pcap_thread->callback_loop
         || pcap_thread->callback_ieee802
@@ -875,7 +911,8 @@ int pcap_thread_set_callback_tcp(pcap_thread_t* pcap_thread, pcap_thread_layer_c
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
-    if (pcap_thread->callback_ether
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
         || pcap_thread->callback_null
         || pcap_thread->callback_loop
         || pcap_thread->callback_ieee802
@@ -1081,6 +1118,23 @@ static void pcap_thread_callback(u_char* user, const struct pcap_pkthdr* pkthdr,
                 pcap_thread_callback_ip((void*)pcaplist, &packet, pkt, length);
             return;
 
+        case DLT_LINUX_SLL:
+            layer_trace("dlt_linux_sll");
+            packet.state = PCAP_THREAD_PACKET_INVALID_LINUX_SLL;
+            need16(packet.linux_sll.packet_type, pkt, length);
+            need16(packet.linux_sll.arp_hardware, pkt, length);
+            need16(packet.linux_sll.link_layer_address_length, pkt, length);
+            needxb(packet.linux_sll.link_layer_address, 8, pkt, length);
+            need16(packet.linux_sll.ether_type, pkt, length);
+            packet.state = PCAP_THREAD_PACKET_OK;
+            packet.have_linux_sll = 1;
+
+            if (pcaplist->pcap_thread->callback_linux_sll)
+                pcaplist->pcap_thread->callback_linux_sll(pcaplist->user, &packet, pkt, length);
+            else
+                pcap_thread_callback_linux_sll((void*)pcaplist, &packet, pkt, length);
+            return;
+
         /* TODO: These might be interesting to implement
         case DLT_IPNET:
         case DLT_PKTAP:
@@ -1095,6 +1149,76 @@ static void pcap_thread_callback(u_char* user, const struct pcap_pkthdr* pkthdr,
         if (packet.state == PCAP_THREAD_PACKET_OK)
             packet.state = PCAP_THREAD_PACKET_INVALID;
         pcaplist->pcap_thread->callback_invalid(pcaplist->user, &packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_linux_sll(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_linux_sll) {
+        layer_trace("have_linux_sll");
+        switch (packet->linux_sll.ether_type) {
+            case 0x8100: /* 802.1q */
+            case 0x88a8: /* 802.1ad */
+            case 0x9100: /* 802.1 QinQ non-standard */
+                if (packet->have_ieee802hdr)
+                    break;
+
+                {
+                    uint16_t tci;
+
+                    packet->state = PCAP_THREAD_PACKET_INVALID_IEEE802;
+                    need16(tci, payload, length);
+                    packet->ieee802hdr.pcp = (tci & 0xe000) >> 13;
+                    packet->ieee802hdr.dei = (tci & 0x1000) >> 12;
+                    packet->ieee802hdr.vid = tci & 0x0fff;
+                    need16(packet->ieee802hdr.ether_type, payload, length);
+                    packet->state = PCAP_THREAD_PACKET_OK;
+                    packet->have_ieee802hdr = 1;
+                }
+
+                if (pcaplist->pcap_thread->callback_ieee802)
+                    pcaplist->pcap_thread->callback_ieee802(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ieee802((void*)pcaplist, packet, payload, length);
+                return;
+
+            case ETHERTYPE_IP:
+            case ETHERTYPE_IPV6:
+                if (pcaplist->pcap_thread->callback_ip)
+                    pcaplist->pcap_thread->callback_ip(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ip((void*)pcaplist, packet, payload, length);
+                return;
+
+            default:
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
     }
 }
 
@@ -2391,7 +2515,8 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         return PCAP_THREAD_NOCALLBACK;
     }
     if (pcap_thread->use_layers
-        && !(pcap_thread->callback_ether
+        && !(pcap_thread->callback_linux_sll
+            || pcap_thread->callback_ether
             || pcap_thread->callback_null
             || pcap_thread->callback_loop
             || pcap_thread->callback_ieee802
@@ -2736,7 +2861,8 @@ int pcap_thread_next(pcap_thread_t* pcap_thread) {
         return PCAP_THREAD_NOCALLBACK;
     }
     if (pcap_thread->use_layers
-        && !(pcap_thread->callback_ether
+        && !(pcap_thread->callback_linux_sll
+            || pcap_thread->callback_ether
             || pcap_thread->callback_null
             || pcap_thread->callback_loop
             || pcap_thread->callback_ieee802
