@@ -40,6 +40,49 @@
 #include <string.h>
 #include <sys/select.h>
 #include <errno.h>
+#ifdef HAVE_ENDIAN_H
+#include <endian.h>
+#endif
+#ifdef HAVE_SYS_ENDIAN_H
+#include <sys/endian.h>
+#endif
+#ifndef __BYTE_ORDER
+#ifdef _BYTE_ORDER
+#define __BYTE_ORDER _BYTE_ORDER
+#else
+#error "No endian byte order define, please fix"
+#endif
+#endif
+#ifndef __LITTLE_ENDIAN
+#ifdef _LITTLE_ENDIAN
+#define __LITTLE_ENDIAN _LITTLE_ENDIAN
+#else
+#error "No little endian define, please fix"
+#endif
+#endif
+#ifndef __BIG_ENDIAN
+#ifdef _BIG_ENDIAN
+#define __BIG_ENDIAN _BIG_ENDIAN
+#else
+#error "No big endian define, please fix"
+#endif
+#endif
+
+/*
+ * Forward declares for layer callbacks
+ */
+
+static void pcap_thread_callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt);
+static void pcap_thread_callback_ether(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_null(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_loop(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_ieee802(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_gre(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_ip(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_udp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_tcp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 
 /*
  * Version
@@ -107,6 +150,27 @@ int pcap_thread_set_use_threads(pcap_thread_t* pcap_thread, const int use_thread
     }
 
     pcap_thread->use_threads = use_threads;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_use_layers(const pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->use_layers;
+}
+
+int pcap_thread_set_use_layers(pcap_thread_t* pcap_thread, const int use_layers) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->use_layers = use_layers;
 
     return PCAP_THREAD_OK;
 }
@@ -581,6 +645,1168 @@ int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
 }
 
 /*
+ * Layers
+ */
+
+int pcap_thread_set_callback_ether(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ether) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_ether = callback_ether;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_null(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_null) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_null = callback_null;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_loop(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_loop) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_loop = callback_loop;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_ieee802(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ieee802) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_ieee802 = callback_ieee802;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_gre(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_gre) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_gre = callback_gre;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_ip(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ip) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_ip = callback_ip;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_ipv4(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv4) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_udp
+        || pcap_thread->callback_tcp)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_ipv4 = callback_ipv4;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv6)
+{
+   if (!pcap_thread) {
+       return PCAP_THREAD_EINVAL;
+   }
+   if (pcap_thread->callback_ether
+       || pcap_thread->callback_null
+       || pcap_thread->callback_loop
+       || pcap_thread->callback_ieee802
+       || pcap_thread->callback_gre
+       || pcap_thread->callback_ip
+       || pcap_thread->callback_udp
+       || pcap_thread->callback_tcp)
+   {
+       return PCAP_THREAD_ELAYERCB;
+   }
+   if (pcap_thread->running) {
+       return PCAP_THREAD_ERUNNING;
+   }
+
+   pcap_thread->callback_ipv6 = callback_ipv6;
+
+   return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_udp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_udp) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_udp = callback_udp;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_tcp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_tcp) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6)
+    {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_tcp = callback_tcp;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_invalid(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_invalid) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_invalid = callback_invalid;
+
+    return PCAP_THREAD_OK;
+}
+
+#define need4x2(v1, v2, p, l) \
+    if (l < 1) { \
+        break; \
+    } \
+    v1 = (*p) >> 4; \
+    v2 = (*p) & 0xf; \
+    p += 1; \
+    l -= 1
+
+#define need8(v, p, l) \
+    if (l < 1) { \
+        break; \
+    } \
+    v = *p; \
+    p += 1; \
+    l -= 1
+
+#define need16(v, p, l) \
+    if (l < 2) { \
+        break; \
+    } \
+    v = ( *p << 8 ) + *(p+1); \
+    p += 2; \
+    l -= 2
+
+#define need32(v, p, l) \
+    if (l < 4) { \
+        break; \
+    } \
+    v = ( *p << 24 ) + ( *(p+1) << 16 ) + ( *(p+2) << 8 ) + *(p+3); \
+    p += 4; \
+    l -= 4
+
+#define needxb(b, x, p, l) \
+    if (l < x) { \
+        break; \
+    } \
+    memcpy(b, p, x); \
+    p += x; \
+    l -= x
+
+#define advancexb(x, p, l) \
+    if (l < x) { \
+        break; \
+    } \
+    p += x; \
+    l -= x
+
+#if 0
+#define layer_trace(msg) printf("LT %s:%d: " msg "\n", __FILE__, __LINE__)
+#define layer_tracef(msg, args...) printf("LT %s:%d: " msg "\n", __FILE__, __LINE__, args)
+#else
+#define layer_trace(msg)
+#define layer_tracef(msg, args...)
+#endif
+
+static void pcap_thread_callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    size_t length;
+    pcap_thread_packet_t packet;
+    const u_char* orig = pkt;
+    size_t origlength;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!pkthdr) {
+        return;
+    }
+    if (!pkt) {
+        return;
+    }
+    if (!name) {
+        return;
+    }
+
+    memset(&packet, 0, sizeof(packet));
+    packet.name = name;
+    packet.dlt = dlt;
+    packet.pkthdr = *pkthdr;
+    packet.have_pkthdr = 1;
+    length = pkthdr->caplen;
+    origlength = length;
+
+    layer_tracef("packet, length %lu", length);
+
+    switch (dlt) {
+        case DLT_NULL:
+            layer_trace("dlt_null");
+            {
+                uint8_t hdr[4];
+
+                packet.state = PCAP_THREAD_PACKET_INVALID_NULL;
+                need8(hdr[0], pkt, length);
+                need8(hdr[1], pkt, length);
+                need8(hdr[2], pkt, length);
+                need8(hdr[3], pkt, length);
+                packet.state = PCAP_THREAD_PACKET_OK;
+
+                /*
+                 * The header for null is in host byte order but may not be
+                 * in the same endian as host if coming from a savefile
+                 */
+
+                if (pcaplist->is_offline && pcap_is_swapped(pcaplist->pcap)) {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+                    packet.nullhdr.family = hdr[3] + (hdr[2] << 8) + (hdr[1] << 16) + (hdr[0] << 24);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+                    packet.nullhdr.family = hdr[0] + (hdr[1] << 8) + (hdr[2] << 16) + (hdr[3] << 24);
+#else
+#error "Please fix <endian.h>"
+#endif
+                }
+                else {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+                    packet.nullhdr.family = hdr[0] + (hdr[1] << 8) + (hdr[2] << 16) + (hdr[3] << 24);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+                    packet.nullhdr.family = hdr[3] + (hdr[2] << 8) + (hdr[1] << 16) + (hdr[0] << 24);
+#else
+#error "Please fix <endian.h>"
+#endif
+                }
+                packet.have_nullhdr = 1;
+
+                if (pcaplist->pcap_thread->callback_null)
+                    pcaplist->pcap_thread->callback_null(pcaplist->user, &packet, pkt, length);
+                else
+                    pcap_thread_callback_null((void*)pcaplist, &packet, pkt, length);
+                return;
+            }
+            break;
+
+        case DLT_EN10MB:
+            layer_trace("dlt_en10mb");
+            packet.state = PCAP_THREAD_PACKET_INVALID_ETHER;
+            needxb(packet.ethhdr.ether_dhost, sizeof(packet.ethhdr.ether_dhost), pkt, length);
+            needxb(packet.ethhdr.ether_shost, sizeof(packet.ethhdr.ether_shost), pkt, length);
+            need16(packet.ethhdr.ether_type, pkt, length);
+            packet.state = PCAP_THREAD_PACKET_OK;
+            packet.have_ethhdr = 1;
+
+            if (pcaplist->pcap_thread->callback_ether)
+                pcaplist->pcap_thread->callback_ether(pcaplist->user, &packet, pkt, length);
+            else
+                pcap_thread_callback_ether((void*)pcaplist, &packet, pkt, length);
+            return;
+
+        case DLT_LOOP:
+            layer_trace("dlt_loop");
+            packet.state = PCAP_THREAD_PACKET_INVALID_LOOP;
+            need32(packet.loophdr.family, pkt, length);
+            packet.state = PCAP_THREAD_PACKET_OK;
+            packet.have_loophdr = 1;
+
+            if (pcaplist->pcap_thread->callback_loop)
+                pcaplist->pcap_thread->callback_loop(pcaplist->user, &packet, pkt, length);
+            else
+                pcap_thread_callback_loop((void*)pcaplist, &packet, pkt, length);
+            return;
+
+        case DLT_RAW:
+        case DLT_IPV4:
+        case DLT_IPV6:
+            layer_trace("dlt_raw/ipv4/ipv6");
+            if (pcaplist->pcap_thread->callback_ip)
+                pcaplist->pcap_thread->callback_ip(pcaplist->user, &packet, pkt, length);
+            else
+                pcap_thread_callback_ip((void*)pcaplist, &packet, pkt, length);
+            return;
+
+        /* TODO: These might be interesting to implement
+        case DLT_IPNET:
+        case DLT_PKTAP:
+        */
+
+        default:
+            packet.state = PCAP_THREAD_PACKET_UNSUPPORTED;
+            break;
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet.state == PCAP_THREAD_PACKET_OK)
+            packet.state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, &packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_ether(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_ethhdr) {
+        layer_trace("have_ethhdr");
+        switch (packet->ethhdr.ether_type) {
+            case 0x8100: /* 802.1q */
+            case 0x88a8: /* 802.1ad */
+            case 0x9100: /* 802.1 QinQ non-standard */
+                if (packet->have_ieee802hdr)
+                    break;
+
+                {
+                    uint16_t tci;
+
+                    packet->state = PCAP_THREAD_PACKET_INVALID_IEEE802;
+                    need16(tci, payload, length);
+                    packet->ieee802hdr.pcp = (tci & 0xe000) >> 13;
+                    packet->ieee802hdr.dei = (tci & 0x1000) >> 12;
+                    packet->ieee802hdr.vid = tci & 0x0fff;
+                    need16(packet->ieee802hdr.ether_type, payload, length);
+                    packet->state = PCAP_THREAD_PACKET_OK;
+                    packet->have_ieee802hdr = 1;
+                }
+
+                if (pcaplist->pcap_thread->callback_ieee802)
+                    pcaplist->pcap_thread->callback_ieee802(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ieee802((void*)pcaplist, packet, payload, length);
+                return;
+
+            case ETHERTYPE_IP:
+            case ETHERTYPE_IPV6:
+                if (pcaplist->pcap_thread->callback_ip)
+                    pcaplist->pcap_thread->callback_ip(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ip((void*)pcaplist, packet, payload, length);
+                return;
+
+            default:
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_null(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_nullhdr) {
+        layer_trace("have_nullhdr");
+
+        /* From libpcap link types documentation:
+         *  containing a value of 2 for IPv4 packets, a value of either 24, 28,
+         *  or 30 for IPv6 packets, a value of 7 for OSI packets, or a value of 23
+         *  for IPX packets. All of the IPv6 values correspond to IPv6 packets;
+         *  code reading files should check for all of them.
+         */
+
+        switch (packet->nullhdr.family) {
+            case 2:
+            case 24:
+            case 28:
+            case 30:
+                if (pcaplist->pcap_thread->callback_ip)
+                    pcaplist->pcap_thread->callback_ip(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ip((void*)pcaplist, packet, payload, length);
+                return;
+
+            default:
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_loop(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_loophdr) {
+        layer_trace("have_loophdr");
+
+        /* From libpcap link types documentation:
+         *  containing a value of 2 for IPv4 packets, a value of either 24, 28,
+         *  or 30 for IPv6 packets, a value of 7 for OSI packets, or a value of 23
+         *  for IPX packets. All of the IPv6 values correspond to IPv6 packets;
+         *  code reading files should check for all of them.
+         */
+
+        switch (packet->loophdr.family) {
+            case 2:
+            case 24:
+            case 28:
+            case 30:
+                if (pcaplist->pcap_thread->callback_ip)
+                    pcaplist->pcap_thread->callback_ip(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ip((void*)pcaplist, packet, payload, length);
+                return;
+
+            default:
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_ieee802(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_ieee802hdr) {
+        layer_trace("have_ieee802hdr");
+
+        switch (packet->ieee802hdr.ether_type) {
+            case 0x88a8: /* 802.1ad */
+            case 0x9100: /* 802.1 QinQ non-standard */
+                {
+                    pcap_thread_packet_t ieee802pkt;
+                    uint16_t tci;
+
+                    memset(&ieee802pkt, 0, sizeof(ieee802pkt));
+                    ieee802pkt.prevpkt = packet;
+                    ieee802pkt.have_prevpkt = 1;
+
+                    packet->state = PCAP_THREAD_PACKET_INVALID_IEEE802;
+                    need16(tci, payload, length);
+                    ieee802pkt.ieee802hdr.pcp = (tci & 0xe000) >> 13;
+                    ieee802pkt.ieee802hdr.dei = (tci & 0x1000) >> 12;
+                    ieee802pkt.ieee802hdr.vid = tci & 0x0fff;
+                    need16(ieee802pkt.ieee802hdr.ether_type, payload, length);
+                    packet->state = PCAP_THREAD_PACKET_OK;
+                    ieee802pkt.have_ieee802hdr = 1;
+
+                    if (pcaplist->pcap_thread->callback_ieee802)
+                        pcaplist->pcap_thread->callback_ieee802(pcaplist->user, &ieee802pkt, payload, length);
+                    else
+                        pcap_thread_callback_ieee802((void*)pcaplist, &ieee802pkt, payload, length);
+                    return;
+                }
+
+            case ETHERTYPE_IP:
+            case ETHERTYPE_IPV6:
+                if (pcaplist->pcap_thread->callback_ip)
+                    pcaplist->pcap_thread->callback_ip(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ip((void*)pcaplist, packet, payload, length);
+                return;
+
+            default:
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_gre(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_grehdr) {
+        pcap_thread_packet_t grepkt;
+
+        layer_trace("have_grehdr");
+
+        memset(&grepkt, 0, sizeof(grepkt));
+        grepkt.prevpkt = packet;
+        grepkt.have_prevpkt = 1;
+
+        for (;;) {
+            packet->state = PCAP_THREAD_PACKET_INVALID_GRE;
+            if (packet->grehdr.gre_flags & 0x1) {
+                need16(packet->gre.checksum, payload, length);
+            }
+            if (packet->grehdr.gre_flags & 0x4) {
+                need16(packet->gre.key, payload, length);
+            }
+            if (packet->grehdr.gre_flags & 0x8) {
+                need16(packet->gre.sequence, payload, length);
+            }
+            packet->state = PCAP_THREAD_PACKET_OK;
+            packet->have_gre = 1;
+
+            switch (packet->grehdr.ether_type) {
+                case ETHERTYPE_IP:
+                case ETHERTYPE_IPV6:
+                    if (pcaplist->pcap_thread->callback_ip)
+                        pcaplist->pcap_thread->callback_ip(pcaplist->user, &grepkt, payload, length);
+                    else
+                        pcap_thread_callback_ip((void*)pcaplist, &grepkt, payload, length);
+                    return;
+
+                default:
+                    packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                    break;
+            }
+            break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_ip(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (!packet->have_iphdr && !packet->have_ip6hdr) {
+        layer_trace("checking for ip");
+
+        for (;;) {
+            packet->state = PCAP_THREAD_PACKET_INVALID_IP;
+            need4x2(packet->iphdr.ip_v, packet->iphdr.ip_hl, payload, length);
+            if (packet->iphdr.ip_v == 4) {
+                packet->state = PCAP_THREAD_PACKET_INVALID_IPV4;
+                need8(packet->iphdr.ip_tos, payload, length);
+                need16(packet->iphdr.ip_len, payload, length);
+                need16(packet->iphdr.ip_id, payload, length);
+                need16(packet->iphdr.ip_off, payload, length);
+                need8(packet->iphdr.ip_ttl, payload, length);
+                need8(packet->iphdr.ip_p, payload, length);
+                need16(packet->iphdr.ip_sum, payload, length);
+                need32(packet->iphdr.ip_src.s_addr, payload, length);
+                need32(packet->iphdr.ip_dst.s_addr, payload, length);
+
+                /* TODO: IPv4 options */
+
+                if (packet->iphdr.ip_hl < 5)
+                    break;
+                if (packet->iphdr.ip_hl > 5) {
+                    advancexb((packet->iphdr.ip_hl - 5) * 4, payload, length);
+                }
+
+                packet->state = PCAP_THREAD_PACKET_OK;
+                packet->have_iphdr = 1;
+
+                if (pcaplist->pcap_thread->callback_ipv4)
+                    pcaplist->pcap_thread->callback_ipv4(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ipv4((void*)pcaplist, packet, payload, length);
+                return;
+            }
+            else if (packet->iphdr.ip_v == 6) {
+                packet->iphdr.ip_v = 0;
+                packet->iphdr.ip_hl = 0;
+                payload--;
+                length--;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_IPV6;
+                need32(packet->ip6hdr.ip6_flow, payload, length);
+                need16(packet->ip6hdr.ip6_plen, payload, length);
+                need8(packet->ip6hdr.ip6_nxt, payload, length);
+                need8(packet->ip6hdr.ip6_hlim, payload, length);
+                needxb(&(packet->ip6hdr.ip6_src), 16, payload, length);
+                needxb(&(packet->ip6hdr.ip6_dst), 16, payload, length);
+                packet->state = PCAP_THREAD_PACKET_OK;
+                packet->have_ip6hdr = 1;
+
+                if (pcaplist->pcap_thread->callback_ipv6)
+                    pcaplist->pcap_thread->callback_ipv6(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_ipv6((void*)pcaplist, packet, payload, length);
+                return;
+            }
+
+            packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+            break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_iphdr) {
+        layer_trace("have_iphdr");
+
+        for (;;) {
+            if (!(packet->iphdr.ip_off & 0x4000) /* may fragment */
+                && !( !(packet->iphdr.ip_off & 0x2000) && !(packet->iphdr.ip_off & 0x1fff) )) /* first and last fragment */
+            {
+                /* The packet may be fragmented and is not the first and last fragment */
+
+                /* TODO: need to reassemble */
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                break;
+            }
+
+            switch (packet->iphdr.ip_p) {
+                case IPPROTO_GRE:
+                    layer_trace("ipproto_gre");
+
+                    if (packet->have_grehdr)
+                        break;
+
+                    packet->state = PCAP_THREAD_PACKET_INVALID_GRE;
+                    need16(packet->grehdr.gre_flags, payload, length);
+                    need16(packet->grehdr.ether_type, payload, length);
+                    packet->state = PCAP_THREAD_PACKET_OK;
+                    packet->have_grehdr = 1;
+
+                    if (pcaplist->pcap_thread->callback_gre)
+                        pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_gre((void*)pcaplist, packet, payload, length);
+                    return;
+
+                case IPPROTO_UDP:
+                    layer_trace("ipproto_udp");
+
+                    if (packet->have_udphdr)
+                        break;
+
+                    packet->state = PCAP_THREAD_PACKET_INVALID_UDP;
+                    need16(packet->udphdr.uh_sport, payload, length);
+                    need16(packet->udphdr.uh_dport, payload, length);
+                    need16(packet->udphdr.uh_ulen, payload, length);
+                    need16(packet->udphdr.uh_sum, payload, length);
+                    packet->state = PCAP_THREAD_PACKET_OK;
+                    packet->have_udphdr = 1;
+
+                    if (pcaplist->pcap_thread->callback_udp)
+                        pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_udp((void*)pcaplist, packet, payload, length);
+                    return;
+
+                case IPPROTO_TCP:
+                    layer_trace("ipproto_tcp");
+
+                    if (packet->have_tcphdr)
+                        break;
+
+                    packet->state = PCAP_THREAD_PACKET_INVALID_TCP;
+                    need16(packet->tcphdr.th_sport, payload, length);
+                    need16(packet->tcphdr.th_dport, payload, length);
+                    need32(packet->tcphdr.th_seq, payload, length);
+                    need32(packet->tcphdr.th_ack, payload, length);
+                    need4x2(packet->tcphdr.th_off, packet->tcphdr.th_x2, payload, length);
+                    need8(packet->tcphdr.th_flags, payload, length);
+                    need16(packet->tcphdr.th_win, payload, length);
+                    need16(packet->tcphdr.th_sum, payload, length);
+                    need16(packet->tcphdr.th_urp, payload, length);
+                    packet->state = PCAP_THREAD_PACKET_OK;
+                    packet->have_tcphdr = 1;
+
+                    if (pcaplist->pcap_thread->callback_tcp)
+                        pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_tcp((void*)pcaplist, packet, payload, length);
+                    return;
+
+                default:
+                    packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                    break;
+            }
+            break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    if (packet->have_ip6hdr) {
+        struct ip6_ext ext;
+
+        layer_trace("have_ip6hdr");
+
+        ext.ip6e_nxt = packet->ip6hdr.ip6_nxt;
+        ext.ip6e_len = 0;
+
+        while (ext.ip6e_nxt != IPPROTO_NONE
+            && ext.ip6e_nxt != IPPROTO_GRE
+            && ext.ip6e_nxt != IPPROTO_UDP
+            && ext.ip6e_nxt != IPPROTO_TCP)
+        {
+            packet->state = PCAP_THREAD_PACKET_INVALID_IPV6HDR;
+            if (ext.ip6e_len) {
+                advancexb((ext.ip6e_len * 8), payload, length);
+            }
+
+            need8(ext.ip6e_nxt, payload, length);
+            need8(ext.ip6e_len, payload, length);
+            packet->state = PCAP_THREAD_PACKET_OK;
+
+            /* TODO: Store IPv6 headers? */
+            /* TODO: Handle IPPROTO_FRAGMENT */
+
+            if (!ext.ip6e_len)
+                break;
+        }
+
+        switch (ext.ip6e_nxt) {
+            case IPPROTO_GRE:
+                if (packet->have_grehdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_GRE;
+                need16(packet->grehdr.gre_flags, payload, length);
+                need16(packet->grehdr.ether_type, payload, length);
+                packet->state = PCAP_THREAD_PACKET_OK;
+                packet->have_grehdr = 1;
+
+                if (pcaplist->pcap_thread->callback_gre)
+                    pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_gre((void*)pcaplist, packet, payload, length);
+                return;
+
+            case IPPROTO_UDP:
+                if (packet->have_udphdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_UDP;
+                need16(packet->udphdr.uh_sport, payload, length);
+                need16(packet->udphdr.uh_dport, payload, length);
+                need16(packet->udphdr.uh_ulen, payload, length);
+                need16(packet->udphdr.uh_sum, payload, length);
+                packet->state = PCAP_THREAD_PACKET_OK;
+                packet->have_udphdr = 1;
+
+                if (pcaplist->pcap_thread->callback_udp)
+                    pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_udp((void*)pcaplist, packet, payload, length);
+                return;
+
+            case IPPROTO_TCP:
+                if (packet->have_tcphdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_TCP;
+                need16(packet->tcphdr.th_sport, payload, length);
+                need16(packet->tcphdr.th_dport, payload, length);
+                need32(packet->tcphdr.th_seq, payload, length);
+                need32(packet->tcphdr.th_ack, payload, length);
+                need4x2(packet->tcphdr.th_off, packet->tcphdr.th_x2, payload, length);
+                need8(packet->tcphdr.th_flags, payload, length);
+                need16(packet->tcphdr.th_win, payload, length);
+                need16(packet->tcphdr.th_sum, payload, length);
+                need16(packet->tcphdr.th_urp, payload, length);
+                packet->state = PCAP_THREAD_PACKET_OK;
+                packet->have_tcphdr = 1;
+
+                if (pcaplist->pcap_thread->callback_tcp)
+                    pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_tcp((void*)pcaplist, packet, payload, length);
+                return;
+
+            default:
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                break;
+        }
+    }
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_udp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    /* TODO: Higher layer support? */
+    packet->state = PCAP_THREAD_PACKET_UNPROCESSED;
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_tcp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    pcap_thread_pcaplist_t* pcaplist = (pcap_thread_pcaplist_t*)user;
+    const u_char* orig = payload;
+    size_t origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    /* TODO: Higher layer support? */
+    packet->state = PCAP_THREAD_PACKET_UNPROCESSED;
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+ }
+
+/*
  * Open/Close
  */
 
@@ -1038,6 +2264,9 @@ static void _callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_ch
         if (pcap_thread->callback) {
             pcap_thread->callback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
         }
+        else if (pcaplist->layer_callback) {
+            pcaplist->layer_callback((void*)pcaplist, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+        }
         else if (pcap_thread->dropback) {
             pcap_thread->dropback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
         }
@@ -1135,12 +2364,15 @@ static void _callback2(u_char* user, const struct pcap_pkthdr* pkthdr, const u_c
         pcaplist->running = 0;
         return;
     }
-    if (!pcaplist->pcap_thread->callback) {
-        pcaplist->running = 0;
-        return;
+    if (pcaplist->pcap_thread->callback) {
+        pcaplist->pcap_thread->callback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
     }
-
-    pcaplist->pcap_thread->callback(pcaplist->user, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+    else if (pcaplist->layer_callback) {
+        pcaplist->layer_callback((void*)pcaplist, pkthdr, pkt, pcaplist->name, pcap_datalink(pcaplist->pcap));
+    }
+    else {
+        pcaplist->running = 0;
+    }
 }
 
 int pcap_thread_run(pcap_thread_t* pcap_thread) {
@@ -1155,7 +2387,21 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
     if (!pcap_thread->pcaplist) {
         return PCAP_THREAD_NOPCAPS;
     }
-    if (!pcap_thread->callback) {
+    if (!pcap_thread->callback && !pcap_thread->use_layers) {
+        return PCAP_THREAD_NOCALLBACK;
+    }
+    if (pcap_thread->use_layers
+        && !(pcap_thread->callback_ether
+            || pcap_thread->callback_null
+            || pcap_thread->callback_loop
+            || pcap_thread->callback_ieee802
+            || pcap_thread->callback_gre
+            || pcap_thread->callback_ip
+            || pcap_thread->callback_ipv4
+            || pcap_thread->callback_ipv6
+            || pcap_thread->callback_udp
+            || pcap_thread->callback_tcp))
+    {
         return PCAP_THREAD_NOCALLBACK;
     }
     if (pcap_thread->running) {
@@ -1252,6 +2498,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
 
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
             pcaplist->pcap_thread = pcap_thread;
+            if (pcap_thread->use_layers) {
+                pcaplist->layer_callback = &pcap_thread_callback;
+            }
             pcaplist->running = 1;
 
             if ((err = pthread_create(&(pcaplist->thread), 0, _thread, (void*)pcaplist))) {
@@ -1269,13 +2518,24 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
                     break;
                 }
 
-                pcap_thread->callback(
-                    pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->user,
-                    &(pcap_thread->pkthdr[pcap_thread->read_pos]),
-                    &(pcap_thread->pkt[pcap_thread->read_pos * pcap_thread->snapshot]),
-                    pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->name,
-                    pcap_datalink(pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->pcap)
-                );
+                if (pcap_thread->callback) {
+                    pcap_thread->callback(
+                        pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->user,
+                        &(pcap_thread->pkthdr[pcap_thread->read_pos]),
+                        &(pcap_thread->pkt[pcap_thread->read_pos * pcap_thread->snapshot]),
+                        pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->name,
+                        pcap_datalink(pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->pcap)
+                    );
+                }
+                else {
+                    pcap_thread_callback(
+                        (void*)pcap_thread->pcaplist_pkt[pcap_thread->read_pos],
+                        &(pcap_thread->pkthdr[pcap_thread->read_pos]),
+                        &(pcap_thread->pkt[pcap_thread->read_pos * pcap_thread->snapshot]),
+                        pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->name,
+                        pcap_datalink(pcap_thread->pcaplist_pkt[pcap_thread->read_pos]->pcap)
+                    );
+                }
 
                 pcap_thread->pcaplist_pkt[pcap_thread->read_pos] = 0;
                 pcap_thread->read_pos++;
@@ -1472,6 +2732,23 @@ int pcap_thread_next(pcap_thread_t* pcap_thread) {
     if (!pcap_thread) {
         return PCAP_THREAD_EINVAL;
     }
+    if (!pcap_thread->callback && !pcap_thread->use_layers) {
+        return PCAP_THREAD_NOCALLBACK;
+    }
+    if (pcap_thread->use_layers
+        && !(pcap_thread->callback_ether
+            || pcap_thread->callback_null
+            || pcap_thread->callback_loop
+            || pcap_thread->callback_ieee802
+            || pcap_thread->callback_gre
+            || pcap_thread->callback_ip
+            || pcap_thread->callback_ipv4
+            || pcap_thread->callback_ipv6
+            || pcap_thread->callback_udp
+            || pcap_thread->callback_tcp))
+    {
+        return PCAP_THREAD_NOCALLBACK;
+    }
     if (pcap_thread->running) {
         return PCAP_THREAD_ERUNNING;
     }
@@ -1496,7 +2773,12 @@ int pcap_thread_next(pcap_thread_t* pcap_thread) {
         PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_next()");
         return PCAP_THREAD_EPCAP;
     }
-    pcap_thread->callback(pcap_thread->step->user, &pkthdr, pkt, pcap_thread->step->name, pcap_datalink(pcap_thread->step->pcap));
+    if (pcap_thread->callback) {
+        pcap_thread->callback(pcap_thread->step->user, &pkthdr, pkt, pcap_thread->step->name, pcap_datalink(pcap_thread->step->pcap));
+    }
+    else {
+        pcap_thread_callback((void*)pcap_thread->step, &pkthdr, pkt, pcap_thread->step->name, pcap_datalink(pcap_thread->step->pcap));
+    }
     pcap_thread->step = pcap_thread->step->next;
 
     return PCAP_THREAD_OK;
@@ -1628,6 +2910,8 @@ const char* pcap_thread_strerr(int error) {
             return PCAP_THREAD_ERUNNING_STR;
         case PCAP_THREAD_ENOPCAPLIST:
             return PCAP_THREAD_ENOPCAPLIST_STR;
+        case PCAP_THREAD_ELAYERCB:
+            return PCAP_THREAD_ELAYERCB_STR;
     }
     return "UNKNOWN";
 }

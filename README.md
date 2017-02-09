@@ -11,6 +11,11 @@ if you have support, launch a thread per `pcap_t` for the collection which
 is then feeded back to the main thread using a queue before being passed on
 to the callback.
 
+Additional callbacks exists for simplifying the handling of various transport
+layers, based on [pcap_layers](https://github.com/wessels/pcap_layers) by
+Duane Wessels (The Measurement Factory, Inc.), such as ether, VLAN, IP, IPv4,
+IPv6, GRE tunnels, UDP and TCP.
+
 ## Usage
 
 Here is a short example how to use this helper, see the hexdump directory
