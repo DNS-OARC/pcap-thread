@@ -394,6 +394,7 @@ pcap_direction_t pcap_thread_direction(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_direction(pcap_thread_t* pcap_thread, const pcap_direction_t direction);
 const char* pcap_thread_filter(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const size_t filter_len);
+int pcap_thread_clear_filter(pcap_thread_t* pcap_thread);
 int pcap_thread_filter_errno(const pcap_thread_t* pcap_thread);
 int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter_optimize);
