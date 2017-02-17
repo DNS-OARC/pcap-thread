@@ -127,6 +127,9 @@ void pcap_thread_free(pcap_thread_t* pcap_thread) {
     }
 
     pcap_thread_close(pcap_thread);
+    if (pcap_thread->filter) {
+        free(pcap_thread->filter);
+    }
     free(pcap_thread);
 }
 
@@ -468,9 +471,27 @@ int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const
     if (pcap_thread->filter) {
         free(pcap_thread->filter);
     }
-
+    if (!(pcap_thread->filter = strndup(filter, filter_len))) {
+        return PCAP_THREAD_ENOMEM;
+    }
     pcap_thread->filter_len = filter_len;
-    pcap_thread->filter = strndup(filter, filter_len);
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_clear_filter(pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    if (pcap_thread->filter) {
+        free(pcap_thread->filter);
+        pcap_thread->filter = 0;
+        pcap_thread->filter_len = 0;
+    }
 
     return PCAP_THREAD_OK;
 }
@@ -2332,6 +2353,7 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
         }
         free(pcaplist);
     }
+    pcap_thread->step = 0;
 
 #ifdef HAVE_PTHREAD
     if (pcap_thread->pkthdr) {
@@ -2347,10 +2369,6 @@ int pcap_thread_close(pcap_thread_t* pcap_thread) {
         pcap_thread->pcaplist_pkt = 0;
     }
 #endif
-    if (pcap_thread->filter) {
-        free(pcap_thread->filter);
-        pcap_thread->filter = 0;
-    }
 
     return PCAP_THREAD_OK;
 }
