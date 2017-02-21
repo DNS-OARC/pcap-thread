@@ -227,7 +227,7 @@ enum pcap_thread_activate_mode {
 #endif
 
 #define PCAP_THREAD_T_INIT { \
-    0, 0, 0, \
+    0, 0, 0, 0, \
     0, 1, 0, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_SIZE, \
     PCAP_THREAD_T_INIT_QUEUE \
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
@@ -246,6 +246,7 @@ struct pcap_thread {
     unsigned short              have_timestamp_precision : 1;
     unsigned short              have_timestamp_type : 1;
     unsigned short              have_direction : 1;
+    unsigned short              was_stopped : 1;
 
     int                         running;
     int                         use_threads;
@@ -406,6 +407,7 @@ struct timeval pcap_thread_timedrun_to(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_timedrun_to(pcap_thread_t* pcap_thread, const struct timeval timedrun_to);
 pcap_thread_activate_mode_t pcap_thread_activate_mode(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_activate_mode(pcap_thread_t* pcap_thread, const pcap_thread_activate_mode_t activate_mode);
+int pcap_thread_was_stopped(const pcap_thread_t* pcap_thread);
 
 size_t pcap_thread_queue_size(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_size);

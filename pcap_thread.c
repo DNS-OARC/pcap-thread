@@ -611,6 +611,14 @@ int pcap_thread_set_activate_mode(pcap_thread_t* pcap_thread, const pcap_thread_
     return PCAP_THREAD_OK;
 }
 
+int pcap_thread_was_stopped(const pcap_thread_t* pcap_thread) {
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+
+    return pcap_thread->was_stopped;
+}
+
 /*
  * Queue
  */
@@ -2637,6 +2645,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         }
 
         pcap_thread->running = 1;
+        pcap_thread->was_stopped = 0;
         err = PCAP_THREAD_OK;
 
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
@@ -2771,6 +2780,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread) {
         struct timeval t1, t2;
 
         pcap_thread->running = 1;
+        pcap_thread->was_stopped = 0;
 
         FD_ZERO(&fds);
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
@@ -2959,6 +2969,7 @@ int pcap_thread_stop(pcap_thread_t* pcap_thread) {
         pcap_breakloop(pcaplist->pcap);
     }
     pcap_thread->running = 0;
+    pcap_thread->was_stopped = 1;
 
 #ifdef HAVE_PTHREAD
     pthread_cond_broadcast(&(pcap_thread->have_packets));
