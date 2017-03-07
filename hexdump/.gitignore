@@ -18,3 +18,4 @@ pcap_thread.h
 stamp-h1
 hexdump
 test-driver
+build/

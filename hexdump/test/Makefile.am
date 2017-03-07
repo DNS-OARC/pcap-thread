@@ -34,9 +34,15 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = test*.log test*.trs \
+	dns.pcap.dist \
     dns.out
 
 TESTS = test1.sh
+
+test1.sh: dns.pcap.dist
+
+dns.pcap.dist: dns.pcap
+	cp "$(srcdir)/dns.pcap" dns.pcap.dist
 
 EXTRA_DIST = $(TESTS) \
     dns.gold \
