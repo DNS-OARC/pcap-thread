@@ -1,3 +1,18 @@
+2017-03-09 Jerry Lundström
+
+    Release 2.0.1
+
+    When converting set functions for some libpcap functionality to a
+    `have_var` bitmap, one of the functions was left with a compare of
+    greater then -1 (`> -1` which will always be true).  This would run
+    `pcap_set_tstamp_type()` every time in `pcap_thread_open()`, if the
+    functionality existed at compile time, and most likely fail.
+
+    Bug fix:
+    - Fix `have_timestamp_type` check.
+
+    e1c9cab Fix unsigned short check
+
 2017-01-23 Jerry Lundström
 
     Release pcap-thread 2.0.0, hexdump 1.2.0
