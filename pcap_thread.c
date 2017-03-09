@@ -2074,7 +2074,7 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void *user)
     }
 
 #ifdef HAVE_PCAP_SET_TSTAMP_TYPE
-    if (pcap_thread->have_timestamp_type > -1 && (pcap_thread->status = pcap_set_tstamp_type(pcap, pcap_thread->timestamp_type))) {
+    if (pcap_thread->have_timestamp_type && (pcap_thread->status = pcap_set_tstamp_type(pcap, pcap_thread->timestamp_type))) {
         pcap_close(pcap);
         free(pcaplist->name);
         free(pcaplist);
