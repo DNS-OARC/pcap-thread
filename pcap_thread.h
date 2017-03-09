@@ -40,9 +40,6 @@
 #include <pthread.h>
 #endif
 
-#ifndef __FAVOR_BSD
-#define __FAVOR_BSD 1 /* Needed for old headers on CentOS 7 to get right structs for UDP and TCP */
-#endif
 #include <pcap/pcap.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -52,8 +49,33 @@
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
-#include <netinet/udp.h>
-#include <netinet/tcp.h>
+#ifdef HAVE_ENDIAN_H
+#include <endian.h>
+#endif
+#ifdef HAVE_SYS_ENDIAN_H
+#include <sys/endian.h>
+#endif
+#ifndef __BYTE_ORDER
+#ifdef _BYTE_ORDER
+#define __BYTE_ORDER _BYTE_ORDER
+#else
+#error "No endian byte order define, please fix"
+#endif
+#endif
+#ifndef __LITTLE_ENDIAN
+#ifdef _LITTLE_ENDIAN
+#define __LITTLE_ENDIAN _LITTLE_ENDIAN
+#else
+#error "No little endian define, please fix"
+#endif
+#endif
+#ifndef __BIG_ENDIAN
+#ifdef _BIG_ENDIAN
+#define __BIG_ENDIAN _BIG_ENDIAN
+#else
+#error "No big endian define, please fix"
+#endif
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -177,8 +199,74 @@ struct pcap_thread_packet {
     struct pcap_thread_gre          gre;
     struct ip                       iphdr;
     struct ip6_hdr                  ip6hdr;
-    struct udphdr                   udphdr;
-    struct tcphdr                   tcphdr;
+    struct {
+        union {
+            struct {
+                u_int16_t uh_sport;
+                u_int16_t uh_dport;
+                u_int16_t uh_ulen;
+                u_int16_t uh_sum;
+            };
+            struct {
+                u_int16_t source;
+                u_int16_t dest;
+                u_int16_t len;
+                u_int16_t check;
+            };
+        };
+    }                               udphdr;
+    struct {
+        union {
+            struct {
+                u_int16_t th_sport;
+                u_int16_t th_dport;
+                u_int32_t th_seq;
+                u_int32_t th_ack;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+                u_int8_t th_x2:4;
+                u_int8_t th_off:4;
+#endif
+#if __BYTE_ORDER == __BIG_ENDIAN
+                u_int8_t th_off:4;
+                u_int8_t th_x2:4;
+#endif
+                u_int8_t th_flags;
+                u_int16_t th_win;
+                u_int16_t th_sum;
+                u_int16_t th_urp;
+            };
+            struct {
+                u_int16_t source;
+                u_int16_t dest;
+                u_int32_t seq;
+                u_int32_t ack_seq;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+                u_int16_t res1:4;
+                u_int16_t doff:4;
+                u_int16_t fin:1;
+                u_int16_t syn:1;
+                u_int16_t rst:1;
+                u_int16_t psh:1;
+                u_int16_t ack:1;
+                u_int16_t urg:1;
+                u_int16_t res2:2;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+                u_int16_t doff:4;
+                u_int16_t res1:4;
+                u_int16_t res2:2;
+                u_int16_t urg:1;
+                u_int16_t ack:1;
+                u_int16_t psh:1;
+                u_int16_t rst:1;
+                u_int16_t syn:1;
+                u_int16_t fin:1;
+#endif
+                u_int16_t window;
+                u_int16_t check;
+                u_int16_t urg_ptr;
+            };
+        };
+    }                               tcphdr;
 
     enum pcap_thread_packet_state   state;
 };

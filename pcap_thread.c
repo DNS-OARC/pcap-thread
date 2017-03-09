@@ -40,33 +40,6 @@
 #include <string.h>
 #include <sys/select.h>
 #include <errno.h>
-#ifdef HAVE_ENDIAN_H
-#include <endian.h>
-#endif
-#ifdef HAVE_SYS_ENDIAN_H
-#include <sys/endian.h>
-#endif
-#ifndef __BYTE_ORDER
-#ifdef _BYTE_ORDER
-#define __BYTE_ORDER _BYTE_ORDER
-#else
-#error "No endian byte order define, please fix"
-#endif
-#endif
-#ifndef __LITTLE_ENDIAN
-#ifdef _LITTLE_ENDIAN
-#define __LITTLE_ENDIAN _LITTLE_ENDIAN
-#else
-#error "No little endian define, please fix"
-#endif
-#endif
-#ifndef __BIG_ENDIAN
-#ifdef _BIG_ENDIAN
-#define __BIG_ENDIAN _BIG_ENDIAN
-#else
-#error "No big endian define, please fix"
-#endif
-#endif
 
 /*
  * Forward declares for layer callbacks
