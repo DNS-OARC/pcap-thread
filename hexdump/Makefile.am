@@ -38,19 +38,17 @@ CLEANFILES = pcap_thread.c pcap_thread.h
 
 SUBDIRS = test
 
-AM_CFLAGS = -Wall -I$(srcdir) $(PTHREAD_CFLAGS)
+AM_CFLAGS = -Wall -I$(srcdir) -I$(top_srcdir)/../ $(PTHREAD_CFLAGS)
 
 bin_PROGRAMS    = hexdump
 
-hexdump_SOURCES = hexdump.c pcap_thread.c pcap_thread.h
+hexdump_SOURCES = hexdump.c pcap_thread.c
 hexdump_LDADD   = $(PTHREAD_LIBS)
 
-hexdump.c: pcap_thread.h
-
 pcap_thread.c: $(top_srcdir)/../pcap_thread.c pcap_thread.h
-	cp "$(top_srcdir)/../pcap_thread.c" "$(srcdir)"
+	cp "$(top_srcdir)/../pcap_thread.c" .
 
 pcap_thread.h: $(top_srcdir)/../pcap_thread.h
-	cp "$(top_srcdir)/../pcap_thread.h" "$(srcdir)"
+	cp "$(top_srcdir)/../pcap_thread.h" .
 
 test: check

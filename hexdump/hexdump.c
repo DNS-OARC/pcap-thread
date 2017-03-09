@@ -44,6 +44,62 @@
 #include <time.h>
 #include <errno.h>
 
+void layer(u_char* user, const pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    const pcap_thread_packet_t* first = packet;
+    size_t n;
+
+    while (first->have_prevpkt) {
+        first = first->prevpkt;
+    }
+
+    if (user) {
+        printf("name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+            first->name,
+            first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
+            first->pkthdr.caplen,
+            first->pkthdr.len,
+            pcap_datalink_val_to_name(first->dlt)
+        );
+    }
+    else {
+        printf("%s ", first->name);
+    }
+    for (n = 0; n < length; n++) {
+        printf("%02x", payload[n]);
+    }
+    printf("\n");
+}
+
+void invalid(u_char* user, const pcap_thread_packet_t* packet, const u_char* payload, size_t length) {
+    const pcap_thread_packet_t* first = packet;
+    size_t n;
+
+    while (first->have_prevpkt) {
+        first = first->prevpkt;
+    }
+
+    if (user) {
+        printf("%s name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+            packet->state == PCAP_THREAD_PACKET_UNSUPPORTED ? "unsupported" : "invalid",
+            first->name,
+            first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
+            first->pkthdr.caplen,
+            first->pkthdr.len,
+            pcap_datalink_val_to_name(first->dlt)
+        );
+    }
+    else {
+        printf("%c%s ",
+            packet->state == PCAP_THREAD_PACKET_UNSUPPORTED ? '?' : '-',
+            first->name
+        );
+    }
+    for (n = 0; n < length; n++) {
+        printf("%02x", payload[n]);
+    }
+    printf("\n");
+}
+
 void callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt) {
     bpf_u_int32 i;
 
@@ -123,7 +179,7 @@ int do_next(int cnt) {
 }
 
 int main(int argc, char** argv) {
-    int opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0, cnt = 0;
+    int opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0, cnt = 0, layers = 0;
     char* interfaces[MAX_INTERFACES];
     char is_file[MAX_INTERFACES];
     char filter[MAX_FILTER_SIZE];
@@ -146,7 +202,7 @@ int main(int argc, char** argv) {
         exit(4);
     }
 
-    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:a:vr:H:P:hDVA:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:a:vr:H:P:hDVA:c:L:")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -320,6 +376,8 @@ int main(int argc, char** argv) {
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 " -P <type>          timestamp precision: micro or nano\n"
 #endif
+" -L <layer>         capture at layer: ether, null, loop, ieee802, gre, ip,\n"
+"                                      ipv4, ipv6, udp or tcp\n"
 " -D                 display stats on exit\n"
 " -V                 display version and exit\n"
 " -h                 this\n"
@@ -339,6 +397,35 @@ int main(int argc, char** argv) {
             break;
         case 'c':
             cnt = atoi(optarg);
+            break;
+        case 'L':
+            if (!strcmp("ether", optarg))
+                ret = pcap_thread_set_callback_ether(&pt, &layer);
+            else if (!strcmp("null", optarg))
+                ret = pcap_thread_set_callback_null(&pt, &layer);
+            else if (!strcmp("loop", optarg))
+                ret = pcap_thread_set_callback_loop(&pt, &layer);
+            else if (!strcmp("ieee802", optarg))
+                ret = pcap_thread_set_callback_ieee802(&pt, &layer);
+            else if (!strcmp("gre", optarg))
+                ret = pcap_thread_set_callback_gre(&pt, &layer);
+            else if (!strcmp("ip", optarg))
+                ret = pcap_thread_set_callback_ip(&pt, &layer);
+            else if (!strcmp("ipv4", optarg))
+                ret = pcap_thread_set_callback_ipv4(&pt, &layer);
+            else if (!strcmp("ipv6", optarg))
+                ret = pcap_thread_set_callback_ipv6(&pt, &layer);
+            else if (!strcmp("udp", optarg))
+                ret = pcap_thread_set_callback_udp(&pt, &layer);
+            else if (!strcmp("tcp", optarg))
+                ret = pcap_thread_set_callback_tcp(&pt, &layer);
+            else
+                err = -1;
+
+            if (ret == PCAP_THREAD_OK)
+                ret = pcap_thread_set_use_layers(&pt, 1);
+
+            layers = 1;
             break;
         default:
             err = -1;
@@ -440,10 +527,12 @@ int main(int argc, char** argv) {
 
     if (filterp != filter && (ret = pcap_thread_set_filter(&pt, filter, filterp - filter)))
         fprintf(stderr, "filter ");
-    else if ((ret = pcap_thread_set_callback(&pt, callback)))
+    else if (!layers && (ret = pcap_thread_set_callback(&pt, callback)))
         fprintf(stderr, "set callback ");
     else if ((ret = pcap_thread_set_dropback(&pt, dropback)))
         fprintf(stderr, "set dropback ");
+    else if (layers && (ret = pcap_thread_set_callback_invalid(&pt, invalid)))
+        fprintf(stderr, "set invalid callback ");
     else {
         for(i = 0; i < interface; i++) {
             if (is_file[i]) {
