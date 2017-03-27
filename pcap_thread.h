@@ -55,22 +55,32 @@
 #ifdef HAVE_SYS_ENDIAN_H
 #include <sys/endian.h>
 #endif
+#ifdef HAVE_MACHINE_ENDIAN_H
+#include <machine/endian.h>
+#endif
+
 #ifndef __BYTE_ORDER
-#ifdef _BYTE_ORDER
+#if defined(BYTE_ORDER)
+#define __BYTE_ORDER BYTE_ORDER
+#elif defined(_BYTE_ORDER)
 #define __BYTE_ORDER _BYTE_ORDER
 #else
 #error "No endian byte order define, please fix"
 #endif
 #endif
 #ifndef __LITTLE_ENDIAN
-#ifdef _LITTLE_ENDIAN
+#if defined(LITTLE_ENDIAN)
+#define __LITTLE_ENDIAN LITTLE_ENDIAN
+#elif defined(_LITTLE_ENDIAN)
 #define __LITTLE_ENDIAN _LITTLE_ENDIAN
 #else
 #error "No little endian define, please fix"
 #endif
 #endif
 #ifndef __BIG_ENDIAN
-#ifdef _BIG_ENDIAN
+#if defined(BIG_ENDIAN)
+#define __BIG_ENDIAN BIG_ENDIAN
+#elif defined(_BIG_ENDIAN)
 #define __BIG_ENDIAN _BIG_ENDIAN
 #else
 #error "No big endian define, please fix"
