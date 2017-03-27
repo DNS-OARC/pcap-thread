@@ -1601,10 +1601,13 @@ static void pcap_thread_callback_ip(u_char* user, pcap_thread_packet_t* packet, 
                 return;
             }
             else if (packet->iphdr.ip_v == 6) {
+                /*
+                 * Clear IPv4 headers and reverse reading one byte
+                 */
                 packet->iphdr.ip_v = 0;
                 packet->iphdr.ip_hl = 0;
                 payload--;
-                length--;
+                length++;
 
                 packet->state = PCAP_THREAD_PACKET_INVALID_IPV6;
                 need32(packet->ip6hdr.ip6_flow, payload, length);
