@@ -1,3 +1,20 @@
+2017-03-28 Jerry Lundström
+
+    Release pcap-thread 2.1.2
+
+    Bugfixes:
+    - The first byte of the IP header is read to determine the IP version
+      and when it is IPv6 the pointers and length variables are "reversed"
+      one byte to later continue reading the whole IPv6 header.  This was
+      done incorrectly and could result in reading outside the boundaries.
+    - Add OS X headers for endian
+
+    6fe2b2a Update
+    7306e58 Issue DNS-OARC/dnscap#65: tv_* are signed
+    a65ac8b Issue DNS-OARC/dnscap#65: Add check for OS X endian
+    4185b7b Issue DNS-OARC/drool#43, DNS-OARC/drool#44: Fix reverse reading
+            a byte
+
 2017-03-09 Jerry Lundström
 
     Release pcap-thread 2.1.1
