@@ -53,9 +53,9 @@ void layer(u_char* user, const pcap_thread_packet_t* packet, const u_char* paylo
     }
 
     if (user) {
-        printf("name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+        printf("name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
             first->name,
-            first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
+            (long)first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
             first->pkthdr.caplen,
             first->pkthdr.len,
             pcap_datalink_val_to_name(first->dlt)
@@ -79,10 +79,10 @@ void invalid(u_char* user, const pcap_thread_packet_t* packet, const u_char* pay
     }
 
     if (user) {
-        printf("%s name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+        printf("%s name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
             packet->state == PCAP_THREAD_PACKET_UNSUPPORTED ? "unsupported" : "invalid",
             first->name,
-            first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
+            (long)first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
             first->pkthdr.caplen,
             first->pkthdr.len,
             pcap_datalink_val_to_name(first->dlt)
@@ -104,9 +104,9 @@ void callback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt,
     bpf_u_int32 i;
 
     if (user) {
-        printf("name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+        printf("name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
             name,
-            pkthdr->ts.tv_sec, pkthdr->ts.tv_usec,
+            (long)pkthdr->ts.tv_sec, pkthdr->ts.tv_usec,
             pkthdr->caplen,
             pkthdr->len,
             pcap_datalink_val_to_name(dlt)
@@ -125,9 +125,9 @@ void dropback(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt,
     bpf_u_int32 i;
 
     if (user) {
-        printf("dropped name:%s ts:%lu.%lu caplen:%d len:%d datalink:%s data:",
+        printf("dropped name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
             name,
-            pkthdr->ts.tv_sec, pkthdr->ts.tv_usec,
+            (long)pkthdr->ts.tv_sec, pkthdr->ts.tv_usec,
             pkthdr->caplen,
             pkthdr->len,
             pcap_datalink_val_to_name(dlt)
@@ -490,7 +490,7 @@ int main(int argc, char** argv) {
         printf("queue_wait: ");
         {
             struct timeval t = pcap_thread_queue_wait(&pt);
-            printf("%lu.%lu\n", t.tv_sec, t.tv_usec);
+            printf("%ld.%ld\n", (long)t.tv_sec, t.tv_usec);
         }
         printf("queue_size: %lu\n", pcap_thread_queue_size(&pt));
         printf("snaplen: %d\n", pcap_thread_snaplen(&pt));
