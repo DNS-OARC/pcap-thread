@@ -87,6 +87,10 @@
 #endif
 #endif
 
+#ifndef PCAP_NETMASK_UNKNOWN
+#define PCAP_NETMASK_UNKNOWN 0xffffffff
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
