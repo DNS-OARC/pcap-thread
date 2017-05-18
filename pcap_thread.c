@@ -1111,8 +1111,12 @@ static void pcap_thread_callback(u_char* user, const struct pcap_pkthdr* pkthdr,
             return;
 
         case DLT_RAW:
+#ifdef DLT_IPV4
         case DLT_IPV4:
+#endif
+#ifdef DLT_IPV6
         case DLT_IPV6:
+#endif
             layer_trace("dlt_raw/ipv4/ipv6");
             if (pcaplist->pcap_thread->callback_ip)
                 pcaplist->pcap_thread->callback_ip(pcaplist->user, &packet, pkt, length);
