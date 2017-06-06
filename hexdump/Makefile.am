@@ -33,7 +33,7 @@
 
 ACLOCAL_AMFLAGS = -I ../m4
 
-MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in $(srcdir)/config.h.in
 CLEANFILES = pcap_thread.c pcap_thread.h
 
 SUBDIRS = test
