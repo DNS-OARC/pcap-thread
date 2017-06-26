@@ -34,6 +34,7 @@
  */
 
 #include "config.h"
+
 #include "pcap_thread.h"
 
 #include <stdlib.h>
@@ -63,6 +64,7 @@ static void pcap_thread_callback_tcp(u_char* user, pcap_thread_packet_t* packet,
  */
 
 static const char* _version = PCAP_THREAD_VERSION_STR;
+
 const char* pcap_thread_version_str(void) {
     return _version;
 }

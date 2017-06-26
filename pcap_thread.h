@@ -41,20 +41,25 @@
 #endif
 
 #include <pcap/pcap.h>
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+
 #include <netinet/in.h>
 #include <net/if_arp.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
+
 #ifdef HAVE_ENDIAN_H
 #include <endian.h>
 #endif
+
 #ifdef HAVE_SYS_ENDIAN_H
 #include <sys/endian.h>
 #endif
+
 #ifdef HAVE_MACHINE_ENDIAN_H
 #include <machine/endian.h>
 #endif
@@ -95,14 +100,16 @@
 extern "C" {
 #endif
 
+/* clang-format off */
+
 #define PCAP_THREAD_VERSION_STR     "2.1.3"
 #define PCAP_THREAD_VERSION_MAJOR   2
 #define PCAP_THREAD_VERSION_MINOR   1
 #define PCAP_THREAD_VERSION_PATCH   3
 
-#define PCAP_THREAD_DEFAULT_TIMEOUT     1000
-#define PCAP_THREAD_DEFAULT_QUEUE_SIZE  64
-#define PCAP_THREAD_DEFAULT_QUEUE_MODE PCAP_THREAD_QUEUE_MODE_COND
+#define PCAP_THREAD_DEFAULT_TIMEOUT       1000
+#define PCAP_THREAD_DEFAULT_QUEUE_SIZE    64
+#define PCAP_THREAD_DEFAULT_QUEUE_MODE    PCAP_THREAD_QUEUE_MODE_COND
 #define PCAP_THREAD_DEFAULT_ACTIVATE_MODE PCAP_THREAD_ACTIVATE_MODE_IMMEDIATE
 
 #define PCAP_THREAD_OK              0
@@ -135,6 +142,8 @@ extern "C" {
 #define PCAP_THREAD_ERUNNING_STR    "pcap thread are running, can not complete task"
 #define PCAP_THREAD_ENOPCAPLIST_STR "no internal reference to the pcap that captured the packet"
 #define PCAP_THREAD_ELAYERCB_STR    "layer callback already set in lower or higher segment"
+
+/* clang-format on */
 
 struct pcap_thread_linux_sll {
     uint16_t    packet_type;
@@ -328,6 +337,7 @@ enum pcap_thread_activate_mode {
 #define PCAP_THREAD_T_INIT_PRECISION 0
 #endif
 
+/* clang-format off */
 #define PCAP_THREAD_T_INIT { \
     0, 0, 0, 0, \
     0, 1, 0, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_SIZE, \
@@ -343,6 +353,7 @@ enum pcap_thread_activate_mode {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0 \
 }
+/* clang-format on */
 
 struct pcap_thread {
     unsigned short              have_timestamp_precision : 1;
@@ -426,6 +437,7 @@ struct pcap_thread {
 #define PCAP_THREAD_PCAPLIST_T_INIT_THREAD
 #endif
 
+/* clang-format off */
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
     0, \
     0, 0, 0, 0, 0, 0, \
@@ -434,6 +446,7 @@ struct pcap_thread {
     { 0, 0 }, \
     0 \
 }
+/* clang-format on */
 
 struct pcap_thread_pcaplist {
     unsigned short          have_bpf : 1;
@@ -457,6 +470,7 @@ struct pcap_thread_pcaplist {
 };
 
 const char* pcap_thread_version_str(void);
+
 int pcap_thread_version_major(void);
 int pcap_thread_version_minor(void);
 int pcap_thread_version_patch(void);
