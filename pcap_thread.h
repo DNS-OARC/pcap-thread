@@ -39,28 +39,21 @@
 #ifdef HAVE_PTHREAD
 #include <pthread.h>
 #endif
-
 #include <pcap/pcap.h>
-
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-
 #include <netinet/in.h>
-
 #include <net/if_arp.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
-
 #ifdef HAVE_ENDIAN_H
 #include <endian.h>
 #endif
-
 #ifdef HAVE_SYS_ENDIAN_H
 #include <sys/endian.h>
 #endif
-
 #ifdef HAVE_MACHINE_ENDIAN_H
 #include <machine/endian.h>
 #endif

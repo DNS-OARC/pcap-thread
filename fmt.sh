@@ -1,7 +1,7 @@
 #!/bin/sh
 
-clang-format-3.8 \
-    -style="{BasedOnStyle: webkit, IndentWidth: 4, AlignConsecutiveAssignments: true, AlignConsecutiveDeclarations: true}" \
+clang-format-4.0 \
+    -style=file \
     -i \
     pcap_thread.c \
     pcap_thread.h \
