@@ -1851,9 +1851,9 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
         ext.ip6e_len = 0;
 
         while (ext.ip6e_nxt != IPPROTO_NONE
-            && ext.ip6e_nxt != IPPROTO_GRE
-            && ext.ip6e_nxt != IPPROTO_UDP
-            && ext.ip6e_nxt != IPPROTO_TCP) {
+               && ext.ip6e_nxt != IPPROTO_GRE
+               && ext.ip6e_nxt != IPPROTO_UDP
+               && ext.ip6e_nxt != IPPROTO_TCP) {
             packet->state = PCAP_THREAD_PACKET_INVALID_IPV6HDR;
             if (ext.ip6e_len) {
                 advancexb((ext.ip6e_len * 8), payload, length);
@@ -2621,7 +2621,7 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
         }
 
         end.tv_sec = start.tv_sec + pcap_thread->timedrun.tv_sec
-            + ((start.tv_usec + pcap_thread->timedrun.tv_usec) / 1000000);
+                     + ((start.tv_usec + pcap_thread->timedrun.tv_usec) / 1000000);
         end.tv_nsec = ((start.tv_usec + pcap_thread->timedrun.tv_usec) % 1000000) * 1000;
     } else if (pcap_thread->timedrun_to.tv_sec) {
         timedrun = 1;

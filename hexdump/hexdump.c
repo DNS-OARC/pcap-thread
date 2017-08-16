@@ -268,9 +268,9 @@ int main(int argc, char** argv)
                 && netmask[3] < 256) {
                 /* TODO: Is this correct? */
                 bpf_u_int32 n = ((netmask[0] & 0xff) << 24)
-                    + ((netmask[1] & 0xff) << 16)
-                    + ((netmask[2] & 0xff) << 8)
-                    + (netmask[3] & 0xff);
+                                + ((netmask[1] & 0xff) << 16)
+                                + ((netmask[2] & 0xff) << 8)
+                                + (netmask[3] & 0xff);
                 ret = pcap_thread_set_filter_netmask(&pt, n);
             } else
                 err = -1;
