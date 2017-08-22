@@ -41,7 +41,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef TIME_WITH_SYS_TIME
+#include <sys/time.h>
 #include <time.h>
+#else
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
+#endif
+#endif
 #include <unistd.h>
 
 void layer(u_char* user, const pcap_thread_packet_t* packet, const u_char* payload, size_t length)
