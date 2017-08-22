@@ -40,6 +40,8 @@ AC_CONFIG_HEADER([config.h])
 AC_PROG_CC
 AM_PROG_CC_C_O
 
+AC_HEADER_TIME
+
 AC_ARG_ENABLE([pthread],
     [AS_HELP_STRING([--disable-pthread],
         [disable the use of pthread])],
