@@ -177,6 +177,7 @@ struct pcap_thread_gre {
     uint16_t key;
     uint16_t sequence;
 };
+typedef enum pcap_thread_packet_state pcap_thread_packet_state_t;
 enum pcap_thread_packet_state {
     PCAP_THREAD_PACKET_OK = 0,
     PCAP_THREAD_PACKET_INVALID,
@@ -193,7 +194,11 @@ enum pcap_thread_packet_state {
     PCAP_THREAD_PACKET_INVALID_IPV6,
     PCAP_THREAD_PACKET_INVALID_IPV6HDR,
     PCAP_THREAD_PACKET_INVALID_UDP,
-    PCAP_THREAD_PACKET_INVALID_TCP
+    PCAP_THREAD_PACKET_INVALID_TCP,
+    PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS,
+    PCAP_THREAD_PACKET_INVALID_FRAGMENTS,
+    PCAP_THREAD_PACKET_NOMEM,
+    PCAP_THREAD_PACKET_EMUTEX
 };
 
 typedef struct pcap_thread_packet pcap_thread_packet_t;
@@ -209,6 +214,8 @@ struct pcap_thread_packet {
     unsigned short have_gre : 1;
     unsigned short have_iphdr : 1;
     unsigned short have_ip6hdr : 1;
+    unsigned short have_ip6frag : 1;
+    unsigned short have_ip6rtdst : 1;
     unsigned short have_udphdr : 1;
     unsigned short have_tcphdr : 1;
 
@@ -225,6 +232,9 @@ struct pcap_thread_packet {
     struct pcap_thread_gre         gre;
     struct ip                      iphdr;
     struct ip6_hdr                 ip6hdr;
+    struct ip6_frag                ip6frag;
+    uint8_t                        ip6frag_payload;
+    struct in6_addr                ip6rtdst;
     struct {
         union {
             struct {
@@ -294,13 +304,36 @@ struct pcap_thread_packet {
         };
     } tcphdr;
 
-    enum pcap_thread_packet_state state;
+    pcap_thread_packet_state_t state;
+};
+
+typedef struct pcap_thread_packet_frag pcap_thread_packet_frag_t;
+struct pcap_thread_packet_frag {
+    pcap_thread_packet_frag_t* next;
+
+    unsigned short flag_more_fragments : 1;
+
+    u_char* payload;
+    size_t  length;
+    size_t  offset;
+};
+
+typedef struct pcap_thread_packet_frags pcap_thread_packet_frags_t;
+struct pcap_thread_packet_frags {
+    pcap_thread_packet_frags_t* next;
+
+    pcap_thread_packet_t       packet;
+    pcap_thread_packet_frag_t* fragments;
+    size_t                     num_fragments;
+    u_char*                    payload;
+    size_t                     length;
 };
 
 typedef enum pcap_thread_queue_mode pcap_thread_queue_mode_t;
 typedef struct pcap_thread          pcap_thread_t;
 typedef void (*pcap_thread_callback_t)(u_char* user, const struct pcap_pkthdr* pkthdr, const u_char* pkt, const char* name, int dlt);
 typedef void (*pcap_thread_layer_callback_t)(u_char* user, const pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+typedef pcap_thread_packet_state_t (*pcap_thread_layer_callback_frag_t)(u_char* user, const pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length);
 typedef void (*pcap_thread_stats_callback_t)(u_char* user, const struct pcap_stat* stats, const char* name, int dlt);
 #ifndef HAVE_PCAP_DIRECTION_T
 typedef int pcap_direction_t;
@@ -342,8 +375,10 @@ enum pcap_thread_activate_mode {
 
 /* clang-format off */
 #define PCAP_THREAD_T_INIT { \
-    0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, \
     0, 1, 0, PCAP_THREAD_DEFAULT_QUEUE_MODE, PCAP_THREAD_DEFAULT_QUEUE_SIZE, \
+    100, 10, \
+    100, 10, \
     PCAP_THREAD_T_INIT_QUEUE \
     0, 0, 0, 0, PCAP_THREAD_DEFAULT_TIMEOUT, \
     0, 0, PCAP_THREAD_T_INIT_PRECISION, 0, \
@@ -353,7 +388,7 @@ enum pcap_thread_activate_mode {
     0, "", 0, 0, \
     { 0, 0 }, { 0, 0 }, \
     PCAP_THREAD_DEFAULT_ACTIVATE_MODE, \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0 \
 }
 /* clang-format on */
@@ -363,12 +398,20 @@ struct pcap_thread {
     unsigned short have_timestamp_type : 1;
     unsigned short have_direction : 1;
     unsigned short was_stopped : 1;
+    unsigned short defrag_ipv4 : 1;
+    unsigned short defrag_ipv6 : 1;
 
     int                      running;
     int                      use_threads;
     int                      use_layers;
     pcap_thread_queue_mode_t queue_mode;
     size_t                   queue_size;
+
+    size_t max_ipv4_fragments;
+    size_t max_ipv4_fragments_per_packet;
+
+    size_t max_ipv6_fragments;
+    size_t max_ipv6_fragments_per_packet;
 
 #ifdef HAVE_PTHREAD
     pthread_cond_t  have_packets;
@@ -417,17 +460,21 @@ struct pcap_thread {
 
     pcap_thread_activate_mode_t activate_mode;
 
-    pcap_thread_layer_callback_t callback_linux_sll;
-    pcap_thread_layer_callback_t callback_ether;
-    pcap_thread_layer_callback_t callback_null;
-    pcap_thread_layer_callback_t callback_loop;
-    pcap_thread_layer_callback_t callback_ieee802;
-    pcap_thread_layer_callback_t callback_gre;
-    pcap_thread_layer_callback_t callback_ip;
-    pcap_thread_layer_callback_t callback_ipv4;
-    pcap_thread_layer_callback_t callback_ipv6;
-    pcap_thread_layer_callback_t callback_udp;
-    pcap_thread_layer_callback_t callback_tcp;
+    pcap_thread_layer_callback_t      callback_linux_sll;
+    pcap_thread_layer_callback_t      callback_ether;
+    pcap_thread_layer_callback_t      callback_null;
+    pcap_thread_layer_callback_t      callback_loop;
+    pcap_thread_layer_callback_t      callback_ieee802;
+    pcap_thread_layer_callback_t      callback_gre;
+    pcap_thread_layer_callback_t      callback_ip;
+    pcap_thread_layer_callback_t      callback_ipv4;
+    pcap_thread_layer_callback_frag_t callback_ipv4_frag;
+    pcap_thread_layer_callback_t      callback_ipv4_frag_release;
+    pcap_thread_layer_callback_t      callback_ipv6;
+    pcap_thread_layer_callback_frag_t callback_ipv6_frag;
+    pcap_thread_layer_callback_t      callback_ipv6_frag_release;
+    pcap_thread_layer_callback_t      callback_udp;
+    pcap_thread_layer_callback_t      callback_tcp;
 
     pcap_thread_layer_callback_t callback_invalid;
 };
@@ -436,8 +483,10 @@ struct pcap_thread {
 
 #ifdef HAVE_PTHREAD
 #define PCAP_THREAD_PCAPLIST_T_INIT_THREAD 0,
+#define PCAP_THREAD_PCAPLIST_T_INIT_FRAGMENTS_MUTEXS PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
 #else
 #define PCAP_THREAD_PCAPLIST_T_INIT_THREAD
+#define PCAP_THREAD_PCAPLIST_T_INIT_FRAGMENTS_MUTEXS
 #endif
 
 /* clang-format off */
@@ -447,7 +496,9 @@ struct pcap_thread {
     0, \
     PCAP_THREAD_PCAPLIST_T_INIT_THREAD \
     { 0, 0 }, \
-    0 \
+    0, \
+    PCAP_THREAD_PCAPLIST_T_INIT_FRAGMENTS_MUTEXS \
+    0, 0, 0, 0, \
 }
 /* clang-format on */
 
@@ -470,6 +521,15 @@ struct pcap_thread_pcaplist {
     struct bpf_program bpf;
 
     pcap_thread_callback_t layer_callback;
+
+#ifdef HAVE_PTHREAD
+    pthread_mutex_t ipv4_fragments_mutex;
+    pthread_mutex_t ipv6_fragments_mutex;
+#endif
+    pcap_thread_packet_frags_t* ipv4_fragments;
+    size_t                      num_ipv4_fragments;
+    pcap_thread_packet_frags_t* ipv6_fragments;
+    size_t                      num_ipv6_fragments;
 };
 
 const char* pcap_thread_version_str(void);
@@ -485,6 +545,18 @@ int pcap_thread_use_threads(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_use_threads(pcap_thread_t* pcap_thread, const int use_threads);
 int pcap_thread_use_layers(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_use_layers(pcap_thread_t* pcap_thread, const int use_layers);
+int pcap_thread_defrag_ipv4(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_defrag_ipv4(pcap_thread_t* pcap_thread, const int defrag_ipv4);
+int pcap_thread_defrag_ipv6(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_defrag_ipv6(pcap_thread_t* pcap_thread, const int defrag_ipv6);
+size_t pcap_thread_max_ipv4_fragments(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_max_ipv4_fragments(pcap_thread_t* pcap_thread, const size_t max_ipv4_fragments);
+size_t pcap_thread_max_ipv4_fragments_per_packet(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_max_ipv4_fragments_per_packet(pcap_thread_t* pcap_thread, const size_t max_ipv4_fragments_per_packet);
+size_t pcap_thread_max_ipv6_fragments(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_max_ipv6_fragments(pcap_thread_t* pcap_thread, const size_t max_ipv6_fragments);
+size_t pcap_thread_max_ipv6_fragments_per_packet(const pcap_thread_t* pcap_thread);
+int pcap_thread_set_max_ipv6_fragments_per_packet(pcap_thread_t* pcap_thread, const size_t max_ipv6_fragments_per_packet);
 pcap_thread_queue_mode_t pcap_thread_queue_mode(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t queue_mode);
 struct timeval pcap_thread_queue_wait(const pcap_thread_t* pcap_thread);
@@ -542,7 +614,9 @@ int pcap_thread_set_callback_ieee802(pcap_thread_t* pcap_thread, pcap_thread_lay
 int pcap_thread_set_callback_gre(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_gre);
 int pcap_thread_set_callback_ip(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ip);
 int pcap_thread_set_callback_ipv4(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv4);
+int pcap_thread_set_callback_ipv4_frag(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_frag_t callback_ipv4_frag, pcap_thread_layer_callback_t callback_ipv4_frag_release);
 int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv6);
+int pcap_thread_set_callback_ipv6_frag(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_frag_t callback_ipv6_frag, pcap_thread_layer_callback_t callback_ipv6_frag_release);
 int pcap_thread_set_callback_udp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_udp);
 int pcap_thread_set_callback_tcp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_tcp);
 int pcap_thread_set_callback_invalid(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_tcp);

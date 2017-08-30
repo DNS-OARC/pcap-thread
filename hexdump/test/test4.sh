@@ -1,3 +1,4 @@
+#!/bin/sh -xe
 # Author Jerry Lundström <jerry@dns-oarc.net>
 # Copyright (c) 2017, OARC, Inc.
 # All rights reserved.
@@ -31,47 +32,14 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
+rm -f test4.out
 
-CLEANFILES = test*.log test*.trs \
-    *.pcap-dist dns.out
-
-TESTS = test1.sh test2.sh \
-    test3_120_1120.sh test3_120_1240.sh test3_120_1400.sh test3_120_1800.sh \
-    test3_120_900.sh test3_1255_2123.sh test3_1255_2345.sh test3_1255_2566.sh \
-    test3_1400_2123.sh test3_1400_2345.sh test3_1400_2566.sh \
-    test3_1600_2123.sh test3_1600_2345.sh test3_1600_2566.sh test3_34_1120.sh \
-    test3_34_1240.sh test3_34_1400.sh test3_34_1800.sh test3_34_900.sh \
-    test3_890_1120.sh test3_890_1240.sh test3_890_1400.sh test3_890_1800.sh \
-    test3_890_900.sh \
-    test4.sh
-
-test1.sh: dns.pcap-dist
-
-test2.sh: v4_frag_dup.pcap-dist v4_frag_empty.pcap-dist \
-    v4_frag_nomf.pcap-dist v4_frag_offset_offbyone1.pcap-dist \
-    v4_frag_offset_offbyone2.pcap-dist v4_frag_order.pcap-dist \
-    v4_frag_skip_first.pcap-dist v4_frag_skip_last.pcap-dist \
-    v4_frag_skip_middle.pcap-dist
-
-test4.sh: v6_frag_dup.pcap-dist v6_frag_empty.pcap-dist \
+for file in v6_frag_dup.pcap-dist v6_frag_empty.pcap-dist \
     v6_frag_nomf.pcap-dist v6_frag_offset_offbyone1.pcap-dist \
     v6_frag_offset_offbyone2.pcap-dist v6_frag_order.pcap-dist \
     v6_frag_skip_first.pcap-dist v6_frag_skip_last.pcap-dist \
-    v6_frag_skip_middle.pcap-dist
+    v6_frag_skip_middle.pcap-dist; do
+        ../hexdump -F 6 -F p6100 -L udp -v -r "$file" >>test4.out
+done
 
-.pcap.pcap-dist:
-	cp "$<" "$@"
-
-EXTRA_DIST = $(TESTS) \
-    dns.gold dns.pcap \
-    v4_frag_dup.pcap v4_frag_empty.pcap v4_frag_nomf.pcap \
-    v4_frag_offset_offbyone1.pcap v4_frag_offset_offbyone2.pcap \
-    v4_frag_order.pcap v4_frag_skip_first.pcap v4_frag_skip_last.pcap \
-    v4_frag_skip_middle.pcap \
-    test2.gold \
-    v6_frag_dup.pcap v6_frag_empty.pcap v6_frag_nomf.pcap \
-    v6_frag_offset_offbyone1.pcap v6_frag_offset_offbyone2.pcap \
-    v6_frag_order.pcap v6_frag_skip_first.pcap v6_frag_skip_last.pcap \
-    v6_frag_skip_middle.pcap \
-    test4.gold
+diff test4.out "$srcdir/test4.gold"

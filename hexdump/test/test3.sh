@@ -32,6 +32,20 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-../hexdump -r ./dns.pcap-dist >dns.out
+workdir="$PWD/bad-packets"
+mkdir -p "$workdir"
 
-diff dns.out "$srcdir/dns.gold"
+do_test() {
+    files=`ls -1 "$workdir/"*.pcap 2>/dev/null`
+    if [ -z "$files" ]; then
+        echo "No PCAP files generated"
+        exit 1
+    fi
+
+    for file in $files; do
+        ../hexdump -F 4 -F p4100 -F 6 -F p6100 -L udp -v -r "$file"
+    done
+}
+
+( cd "$srcdir/bad-packets" && make FRAG_PKT_SIZE=@PKT_SIZE@ FRAG_SIZE=@FRAG_SIZE@ NUM_PKTS=20 DESTDIR="$workdir" clean fuzz )
+do_test

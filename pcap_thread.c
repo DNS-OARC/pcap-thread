@@ -55,7 +55,11 @@ static void pcap_thread_callback_ieee802(u_char* user, pcap_thread_packet_t* pac
 static void pcap_thread_callback_gre(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_ip(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static pcap_thread_packet_state_t pcap_thread_callback_ipv4_frag(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length);
+static void pcap_thread_callback_ipv4_frag_release(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static pcap_thread_packet_state_t pcap_thread_callback_ipv6_frag(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length);
+static void pcap_thread_callback_ipv6_frag_release(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_udp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_tcp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 
@@ -160,6 +164,144 @@ int pcap_thread_set_use_layers(pcap_thread_t* pcap_thread, const int use_layers)
     }
 
     pcap_thread->use_layers = use_layers;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_defrag_ipv4(const pcap_thread_t* pcap_thread)
+{
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->defrag_ipv4;
+}
+
+int pcap_thread_set_defrag_ipv4(pcap_thread_t* pcap_thread, const int defrag_ipv4)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->defrag_ipv4 = defrag_ipv4;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_defrag_ipv6(const pcap_thread_t* pcap_thread)
+{
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->defrag_ipv6;
+}
+
+int pcap_thread_set_defrag_ipv6(pcap_thread_t* pcap_thread, const int defrag_ipv6)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->defrag_ipv6 = defrag_ipv6;
+
+    return PCAP_THREAD_OK;
+}
+
+size_t pcap_thread_max_ipv4_fragments(const pcap_thread_t* pcap_thread)
+{
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->max_ipv4_fragments;
+}
+
+int pcap_thread_set_max_ipv4_fragments(pcap_thread_t* pcap_thread, const size_t max_ipv4_fragments)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->max_ipv4_fragments = max_ipv4_fragments;
+
+    return PCAP_THREAD_OK;
+}
+
+size_t pcap_thread_max_ipv4_fragments_per_packet(const pcap_thread_t* pcap_thread)
+{
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->max_ipv4_fragments_per_packet;
+}
+
+int pcap_thread_set_max_ipv4_fragments_per_packet(pcap_thread_t* pcap_thread, const size_t max_ipv4_fragments_per_packet)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->max_ipv4_fragments_per_packet = max_ipv4_fragments_per_packet;
+
+    return PCAP_THREAD_OK;
+}
+
+size_t pcap_thread_max_ipv6_fragments(const pcap_thread_t* pcap_thread)
+{
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->max_ipv6_fragments;
+}
+
+int pcap_thread_set_max_ipv6_fragments(pcap_thread_t* pcap_thread, const size_t max_ipv6_fragments)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->max_ipv6_fragments = max_ipv6_fragments;
+
+    return PCAP_THREAD_OK;
+}
+
+size_t pcap_thread_max_ipv6_fragments_per_packet(const pcap_thread_t* pcap_thread)
+{
+    if (!pcap_thread) {
+        return -1;
+    }
+
+    return pcap_thread->max_ipv6_fragments_per_packet;
+}
+
+int pcap_thread_set_max_ipv6_fragments_per_packet(pcap_thread_t* pcap_thread, const size_t max_ipv6_fragments_per_packet)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->max_ipv6_fragments_per_packet = max_ipv6_fragments_per_packet;
 
     return PCAP_THREAD_OK;
 }
@@ -915,6 +1057,25 @@ int pcap_thread_set_callback_ipv4(pcap_thread_t* pcap_thread, pcap_thread_layer_
     return PCAP_THREAD_OK;
 }
 
+int pcap_thread_set_callback_ipv4_frag(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_frag_t callback_ipv4_frag, pcap_thread_layer_callback_t callback_ipv4_frag_release)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if ((callback_ipv4_frag && !callback_ipv4_frag_release)
+        || (!callback_ipv4_frag && callback_ipv4_frag_release)) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_ipv4_frag         = callback_ipv4_frag;
+    pcap_thread->callback_ipv4_frag_release = callback_ipv4_frag_release;
+
+    return PCAP_THREAD_OK;
+}
+
 int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv6)
 {
     if (!pcap_thread) {
@@ -936,6 +1097,25 @@ int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_
     }
 
     pcap_thread->callback_ipv6 = callback_ipv6;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_ipv6_frag(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_frag_t callback_ipv6_frag, pcap_thread_layer_callback_t callback_ipv6_frag_release)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if ((callback_ipv6_frag && !callback_ipv6_frag_release)
+        || (!callback_ipv6_frag && callback_ipv6_frag_release)) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_ipv6_frag         = callback_ipv6_frag;
+    pcap_thread->callback_ipv6_frag_release = callback_ipv6_frag_release;
 
     return PCAP_THREAD_OK;
 }
@@ -1707,9 +1887,10 @@ static void pcap_thread_callback_ip(u_char* user, pcap_thread_packet_t* packet, 
 
 static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length)
 {
-    pcap_thread_pcaplist_t* pcaplist   = (pcap_thread_pcaplist_t*)user;
-    const u_char*           orig       = payload;
-    size_t                  origlength = length;
+    pcap_thread_pcaplist_t* pcaplist     = (pcap_thread_pcaplist_t*)user;
+    const u_char*           orig         = payload;
+    size_t                  origlength   = length;
+    int                     release_frag = 0;
 
     if (!pcaplist) {
         return;
@@ -1731,14 +1912,38 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
         layer_trace("have_iphdr");
 
         for (;;) {
-            if (!(packet->iphdr.ip_off & 0x4000) /* may fragment */
-                && !(!(packet->iphdr.ip_off & 0x2000) && !(packet->iphdr.ip_off & 0x1fff))) /* first and last fragment */
-            {
-                /* The packet may be fragmented and is not the first and last fragment */
+            /* Check if packet wants more fragments or has an offset */
+            if (packet->iphdr.ip_off & 0x2000 || packet->iphdr.ip_off & 0x1fff) {
+                pcap_thread_packet_t*      whole_packet  = 0;
+                const u_char*              whole_payload = 0;
+                size_t                     whole_length  = 0;
+                pcap_thread_packet_state_t state;
 
-                /* TODO: need to reassemble */
-                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
-                break;
+                layer_trace("is_v4_frag");
+
+                if (pcaplist->pcap_thread->callback_ipv4_frag)
+                    state = pcaplist->pcap_thread->callback_ipv4_frag(pcaplist->user, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+                else if (pcaplist->pcap_thread->defrag_ipv4)
+                    state = pcap_thread_callback_ipv4_frag((void*)pcaplist, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+                else {
+                    state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                }
+
+                if (state != PCAP_THREAD_PACKET_OK) {
+                    // TODO: Only last packet will be invalid, can we invalidate the others?
+                    break;
+                }
+
+                if (!whole_packet) {
+                    return;
+                }
+
+                layer_tracef("v4_reasm %p %p %lu", whole_packet, whole_payload, whole_length);
+
+                packet       = whole_packet;
+                payload      = whole_payload;
+                length       = whole_length;
+                release_frag = 1;
             }
 
             switch (packet->iphdr.ip_p) {
@@ -1758,6 +1963,13 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                     pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
                 else
                     pcap_thread_callback_gre((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv4_frag_release)
+                        pcaplist->pcap_thread->callback_ipv4_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv4_frag_release((void*)pcaplist, packet, payload, length);
+                }
                 return;
 
             case IPPROTO_UDP:
@@ -1778,6 +1990,13 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                     pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
                 else
                     pcap_thread_callback_udp((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv4_frag_release)
+                        pcaplist->pcap_thread->callback_ipv4_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv4_frag_release((void*)pcaplist, packet, payload, length);
+                }
                 return;
 
             case IPPROTO_TCP:
@@ -1803,6 +2022,13 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                     pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
                 else
                     pcap_thread_callback_tcp((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv4_frag_release)
+                        pcaplist->pcap_thread->callback_ipv4_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv4_frag_release((void*)pcaplist, packet, payload, length);
+                }
                 return;
 
             default:
@@ -1818,13 +2044,326 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
             packet->state = PCAP_THREAD_PACKET_INVALID;
         pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
     }
+
+    if (release_frag) {
+        if (pcaplist->pcap_thread->callback_ipv4_frag_release)
+            pcaplist->pcap_thread->callback_ipv4_frag_release(pcaplist->user, packet, payload, length);
+        else
+            pcap_thread_callback_ipv4_frag_release((void*)pcaplist, packet, payload, length);
+    }
+}
+
+static pcap_thread_packet_state_t pcap_thread_callback_ipv4_frag(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length)
+{
+    pcap_thread_pcaplist_t*     pcaplist = (pcap_thread_pcaplist_t*)user;
+    pcap_thread_packet_frags_t *frags, *frags_prev;
+    pcap_thread_packet_frag_t * frag, *f, *f_prev;
+
+    if (!pcaplist) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!pcaplist->pcap_thread) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!packet) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!payload) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!length) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!whole_packet) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!whole_payload) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!whole_length) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!packet->have_iphdr) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+
+#ifdef HAVE_PTHREAD
+    if (pthread_mutex_lock(&(pcaplist->ipv4_fragments_mutex))) {
+        return PCAP_THREAD_PACKET_EMUTEX;
+    }
+#endif
+
+    /* Find packet fragments */
+    for (frags_prev = 0, frags = pcaplist->ipv4_fragments; frags; frags_prev = frags, frags = frags->next) {
+        if (packet->iphdr.ip_id == frags->packet.iphdr.ip_id
+            && packet->iphdr.ip_p == frags->packet.iphdr.ip_p
+            && packet->iphdr.ip_src.s_addr == frags->packet.iphdr.ip_src.s_addr
+            && packet->iphdr.ip_dst.s_addr == frags->packet.iphdr.ip_dst.s_addr) {
+
+            layer_tracef("frag %d found", packet->iphdr.ip_id);
+
+            /* Found it, remove from list */
+            if (frags_prev) {
+                frags_prev->next = frags->next;
+            }
+            if (pcaplist->ipv4_fragments == frags) {
+                pcaplist->ipv4_fragments = frags->next;
+            }
+            frags->next = 0;
+            break;
+        }
+    }
+
+    /* No fragments found, create new */
+    if (!frags) {
+        if (pcaplist->num_ipv4_fragments >= pcaplist->pcap_thread->max_ipv4_fragments) {
+#ifdef HAVE_PTHREAD
+            pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+            layer_trace("too many frags");
+            return PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS;
+        }
+
+        if (!(frags = calloc(1, sizeof(pcap_thread_packet_frags_t)))) {
+#ifdef HAVE_PTHREAD
+            pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+            layer_trace("nomem frag");
+            return PCAP_THREAD_PACKET_NOMEM;
+        }
+
+        layer_tracef("new frag %d", packet->iphdr.ip_id);
+
+        // TODO: How to handle prevpkt
+        memcpy(&(frags->packet.iphdr), &(packet->iphdr), sizeof(struct ip));
+        frags->packet.have_iphdr = 1;
+        pcaplist->num_ipv4_fragments++;
+    }
+
+    /* Put the fragments first on the list */
+    frags->next              = pcaplist->ipv4_fragments;
+    pcaplist->ipv4_fragments = frags;
+
+    if (frags->payload) {
+/* Already reassembled */
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+        layer_trace("invalid frags");
+        return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+    }
+
+    if (frags->num_fragments >= pcaplist->pcap_thread->max_ipv4_fragments_per_packet) {
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+        layer_trace("too many frags");
+        return PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS;
+    }
+
+    /* Allocate for the new fragment */
+    if (!(frag = calloc(1, sizeof(pcap_thread_packet_frag_t)))) {
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+        layer_trace("nomem frag");
+        return PCAP_THREAD_PACKET_NOMEM;
+    }
+    if (!(frag->payload = calloc(1, length))) {
+        free(frag);
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+        layer_trace("nomem frag");
+        return PCAP_THREAD_PACKET_NOMEM;
+    }
+    memcpy(frag->payload, payload, length);
+    frag->length              = length;
+    frag->offset              = (packet->iphdr.ip_off & 0x1fff) * 8;
+    frag->flag_more_fragments = packet->iphdr.ip_off & 0x2000 ? 1 : 0;
+    layer_tracef("new frag len %lu off %lu mf %d", frag->length, frag->offset, frag->flag_more_fragments);
+
+    /* Place the fragment in the fragments list, order of offset */
+    for (f_prev = 0, f = frags->fragments; f; f_prev = f, f = f->next) {
+        if (f->offset > frag->offset) {
+            if (f_prev) {
+                f_prev->next = frag;
+            } else {
+                frags->fragments = frag;
+            }
+            frag->next = f;
+            break;
+        }
+    }
+    if (!f) {
+        if (f_prev) {
+            f_prev->next = frag;
+        } else {
+            frag->next       = frags->fragments;
+            frags->fragments = frag;
+        }
+    }
+    frags->num_fragments++;
+
+    /* Do we have more then one fragment */
+    if (frags->num_fragments > 1) {
+        size_t length = 0;
+
+        /* Check if we have all fragments */
+        for (f_prev = 0, f = frags->fragments; f; f_prev = f, f = f->next) {
+            layer_tracef("checking frag %p len %lu off %lu mf %d next %p", f, f->length, f->offset, f->flag_more_fragments, f->next);
+
+            if (f->next) {
+                /* If there is a next fragment, this should need more fragments */
+                if (!f->flag_more_fragments) {
+#ifdef HAVE_PTHREAD
+                    pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+                    layer_trace("invalid frags, no need more");
+                    return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+                }
+                /* Check that fragments don't overlay */
+                if (f->offset + f->length > f->next->offset) {
+#ifdef HAVE_PTHREAD
+                    pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+                    layer_trace("invalid frags, overlapping next");
+                    return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+                }
+            }
+
+            if (f_prev) {
+                /* Check that fragments don't overlay */
+                if (f_prev->offset + f_prev->length > f->offset) {
+#ifdef HAVE_PTHREAD
+                    pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+                    layer_trace("invalid frags, prev overlapping");
+                    return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+                }
+                /* Check if we are missing fragments */
+                if (f_prev->offset + f_prev->length < f->offset) {
+#ifdef HAVE_PTHREAD
+                    if (pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex))) {
+                        return PCAP_THREAD_PACKET_EMUTEX;
+                    }
+#endif
+                    layer_trace("need more frags, missing next frag");
+                    return PCAP_THREAD_PACKET_OK;
+                }
+            }
+
+            length += f->length;
+        }
+        /* All fragments on the list aligns, check if we have the first and last fragment */
+        if (frags->fragments && !frags->fragments->offset && f_prev && !f_prev->flag_more_fragments) {
+            u_char* p;
+            /* reassemble all fragments */
+            if (!(frags->payload = calloc(1, length))) {
+#ifdef HAVE_PTHREAD
+                pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+                layer_trace("nomem frag");
+                return PCAP_THREAD_PACKET_NOMEM;
+            }
+            frags->length = length;
+            for (p = frags->payload, f = frags->fragments; f; f = f->next) {
+                layer_tracef("%p %p %lu", p, f->payload, f->length);
+                memcpy(p, f->payload, f->length);
+                p = p + f->length;
+            }
+
+            frags->packet.name   = packet->name;
+            frags->packet.dlt    = packet->dlt;
+            frags->packet.pkthdr = packet->pkthdr;
+
+            *whole_packet  = &(frags->packet);
+            *whole_payload = frags->payload;
+            *whole_length  = frags->length;
+        }
+    }
+
+#ifdef HAVE_PTHREAD
+    if (pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex))) {
+        return PCAP_THREAD_PACKET_EMUTEX;
+    }
+#endif
+    return PCAP_THREAD_PACKET_OK;
+}
+
+static void pcap_thread_callback_ipv4_frag_release(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length)
+{
+    pcap_thread_pcaplist_t*     pcaplist = (pcap_thread_pcaplist_t*)user;
+    pcap_thread_packet_frags_t *frags, *frags_prev;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!packet->have_iphdr) {
+        return;
+    }
+
+#ifdef HAVE_PTHREAD
+    if (pthread_mutex_lock(&(pcaplist->ipv4_fragments_mutex))) {
+        return;
+    }
+#endif
+
+    /* Find packet fragments */
+    for (frags_prev = 0, frags = pcaplist->ipv4_fragments; frags; frags_prev = frags, frags = frags->next) {
+        if (packet->iphdr.ip_id == frags->packet.iphdr.ip_id
+            && packet->iphdr.ip_p == frags->packet.iphdr.ip_p
+            && packet->iphdr.ip_src.s_addr == frags->packet.iphdr.ip_src.s_addr
+            && packet->iphdr.ip_dst.s_addr == frags->packet.iphdr.ip_dst.s_addr) {
+
+            /* Found it, remove from list */
+            if (frags_prev) {
+                frags_prev->next = frags->next;
+            }
+            if (pcaplist->ipv4_fragments == frags) {
+                pcaplist->ipv4_fragments = frags->next;
+            }
+            frags->next = 0;
+            pcaplist->num_ipv4_fragments--;
+            break;
+        }
+    }
+
+#ifdef HAVE_PTHREAD
+    pthread_mutex_unlock(&(pcaplist->ipv4_fragments_mutex));
+#endif
+
+    if (frags) {
+        pcap_thread_packet_frag_t *frag, *f;
+
+        for (f = frags->fragments; f;) {
+            frag = f;
+            f    = f->next;
+            if (frag->payload) {
+                free(frag->payload);
+            }
+            free(frag);
+        }
+
+        if (frags->payload) {
+            free(frags->payload);
+        }
+        free(frags);
+    }
 }
 
 static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length)
 {
-    pcap_thread_pcaplist_t* pcaplist   = (pcap_thread_pcaplist_t*)user;
-    const u_char*           orig       = payload;
-    size_t                  origlength = length;
+    pcap_thread_pcaplist_t* pcaplist     = (pcap_thread_pcaplist_t*)user;
+    const u_char*           orig         = payload;
+    size_t                  origlength   = length;
+    int                     release_frag = 0;
 
     if (!pcaplist) {
         return;
@@ -1844,92 +2383,221 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
 
     if (packet->have_ip6hdr) {
         struct ip6_ext ext;
+        size_t         already_advanced = 0;
 
         layer_trace("have_ip6hdr");
 
         ext.ip6e_nxt = packet->ip6hdr.ip6_nxt;
         ext.ip6e_len = 0;
-
         while (ext.ip6e_nxt != IPPROTO_NONE
                && ext.ip6e_nxt != IPPROTO_GRE
                && ext.ip6e_nxt != IPPROTO_UDP
                && ext.ip6e_nxt != IPPROTO_TCP) {
             packet->state = PCAP_THREAD_PACKET_INVALID_IPV6HDR;
+
+            /*
+             * Advance to the start of next header, this may not be needed
+             * if it's the first header or if the header is supported.
+             */
             if (ext.ip6e_len) {
-                advancexb((ext.ip6e_len * 8), payload, length);
+                if (ext.ip6e_len < already_advanced) {
+                    /* Header length is invalid */
+                    layer_trace("ip6hdr invalid");
+                    break;
+                }
+                /* Advance if not already there */
+                else if (ext.ip6e_len > already_advanced) {
+                    advancexb((ext.ip6e_len - already_advanced) * 8, payload, length);
+                }
+                already_advanced = 0;
+            } else if (already_advanced) {
+                /* Already advanced but header has no length */
+                layer_trace("ip6hdr already advanced");
+                break;
             }
 
-            need8(ext.ip6e_nxt, payload, length);
-            need8(ext.ip6e_len, payload, length);
-            packet->state = PCAP_THREAD_PACKET_OK;
-
             /* TODO: Store IPv6 headers? */
-            /* TODO: Handle IPPROTO_FRAGMENT */
+
+            /* Handle supported headers */
+            if (ext.ip6e_nxt == IPPROTO_FRAGMENT) {
+                if (packet->have_ip6frag) {
+                    layer_trace("dup ip6frag");
+                    break;
+                }
+                layer_trace("ip6frag");
+                need8(ext.ip6e_nxt, payload, length);
+                need8(packet->ip6frag.ip6f_reserved, payload, length);
+                need16(packet->ip6frag.ip6f_offlg, payload, length);
+                need32(packet->ip6frag.ip6f_ident, payload, length);
+                packet->have_ip6frag = 1;
+
+                layer_tracef("ip6frag r %02x off %02x/%d flag %02x m %d id %04x",
+                    packet->ip6frag.ip6f_reserved,
+                    (packet->ip6frag.ip6f_offlg & 0xfff8) >> 3,
+                    ((packet->ip6frag.ip6f_offlg & 0xfff8) >> 3) * 8,
+                    packet->ip6frag.ip6f_offlg & 0x6,
+                    packet->ip6frag.ip6f_offlg & 0x1,
+                    packet->ip6frag.ip6f_ident);
+                ext.ip6e_len     = 1;
+                already_advanced = 1;
+            } else if (ext.ip6e_nxt == IPPROTO_ROUTING) {
+                struct ip6_rthdr rthdr;
+                struct in6_addr  rt[255];
+
+                if (packet->have_ip6rtdst) {
+                    layer_trace("dup ip6rtdst");
+                    break;
+                }
+                need8(ext.ip6e_nxt, payload, length);
+                need8(ext.ip6e_len, payload, length);
+                need8(rthdr.ip6r_type, payload, length);
+                need8(rthdr.ip6r_segleft, payload, length);
+                if (!rthdr.ip6r_type) {
+                    if (rthdr.ip6r_segleft > ext.ip6e_len)
+                        break;
+                    for (rthdr.ip6r_len = 0; rthdr.ip6r_len < ext.ip6e_len; rthdr.ip6r_len++, already_advanced += 2) {
+                        needxb(&rt[rthdr.ip6r_len], 16, payload, length);
+                    }
+                    if (!rthdr.ip6r_len || rthdr.ip6r_len != ext.ip6e_len) {
+                        break;
+                    }
+                    if (rthdr.ip6r_segleft) {
+                        packet->ip6rtdst      = rt[rthdr.ip6r_segleft];
+                        packet->have_ip6rtdst = 1;
+                    }
+                }
+            } else {
+                /* Nonsupported header */
+                layer_trace("ip6hdr?");
+                need8(ext.ip6e_nxt, payload, length);
+                need8(ext.ip6e_len, payload, length);
+            }
+
+            packet->state = PCAP_THREAD_PACKET_OK;
 
             if (!ext.ip6e_len)
                 break;
         }
 
-        switch (ext.ip6e_nxt) {
-        case IPPROTO_GRE:
-            if (packet->have_grehdr)
+        for (; packet->state == PCAP_THREAD_PACKET_OK;) {
+            if (packet->have_ip6frag) {
+                pcap_thread_packet_t*      whole_packet  = 0;
+                const u_char*              whole_payload = 0;
+                size_t                     whole_length  = 0;
+                pcap_thread_packet_state_t state;
+
+                packet->ip6frag_payload = ext.ip6e_nxt;
+
+                layer_trace("is_v6_frag");
+
+                if (pcaplist->pcap_thread->callback_ipv6_frag)
+                    state = pcaplist->pcap_thread->callback_ipv6_frag(pcaplist->user, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+                else if (pcaplist->pcap_thread->defrag_ipv6)
+                    state = pcap_thread_callback_ipv6_frag((void*)pcaplist, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+                else {
+                    state = PCAP_THREAD_PACKET_UNSUPPORTED;
+                }
+
+                if (state != PCAP_THREAD_PACKET_OK) {
+                    // TODO: Only last packet will be invalid, can we invalidate the others?
+                    break;
+                }
+
+                if (!whole_packet) {
+                    return;
+                }
+
+                layer_tracef("v6_reasm %p %p %lu", whole_packet, whole_payload, whole_length);
+
+                packet       = whole_packet;
+                payload      = whole_payload;
+                length       = whole_length;
+                release_frag = 1;
+            }
+
+            switch (ext.ip6e_nxt) {
+            case IPPROTO_GRE:
+                if (packet->have_grehdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_GRE;
+                need16(packet->grehdr.gre_flags, payload, length);
+                need16(packet->grehdr.ether_type, payload, length);
+                packet->state       = PCAP_THREAD_PACKET_OK;
+                packet->have_grehdr = 1;
+
+                if (pcaplist->pcap_thread->callback_gre)
+                    pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_gre((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv6_frag_release)
+                        pcaplist->pcap_thread->callback_ipv6_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv6_frag_release((void*)pcaplist, packet, payload, length);
+                }
+                return;
+
+            case IPPROTO_UDP:
+                if (packet->have_udphdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_UDP;
+                need16(packet->udphdr.uh_sport, payload, length);
+                need16(packet->udphdr.uh_dport, payload, length);
+                need16(packet->udphdr.uh_ulen, payload, length);
+                need16(packet->udphdr.uh_sum, payload, length);
+                packet->state       = PCAP_THREAD_PACKET_OK;
+                packet->have_udphdr = 1;
+
+                if (pcaplist->pcap_thread->callback_udp)
+                    pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_udp((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv6_frag_release)
+                        pcaplist->pcap_thread->callback_ipv6_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv6_frag_release((void*)pcaplist, packet, payload, length);
+                }
+                return;
+
+            case IPPROTO_TCP:
+                if (packet->have_tcphdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_TCP;
+                need16(packet->tcphdr.th_sport, payload, length);
+                need16(packet->tcphdr.th_dport, payload, length);
+                need32(packet->tcphdr.th_seq, payload, length);
+                need32(packet->tcphdr.th_ack, payload, length);
+                need4x2(packet->tcphdr.th_off, packet->tcphdr.th_x2, payload, length);
+                need8(packet->tcphdr.th_flags, payload, length);
+                need16(packet->tcphdr.th_win, payload, length);
+                need16(packet->tcphdr.th_sum, payload, length);
+                need16(packet->tcphdr.th_urp, payload, length);
+                packet->state       = PCAP_THREAD_PACKET_OK;
+                packet->have_tcphdr = 1;
+
+                if (pcaplist->pcap_thread->callback_tcp)
+                    pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_tcp((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv6_frag_release)
+                        pcaplist->pcap_thread->callback_ipv6_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv6_frag_release((void*)pcaplist, packet, payload, length);
+                }
+                return;
+
+            default:
+                packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
                 break;
-
-            packet->state = PCAP_THREAD_PACKET_INVALID_GRE;
-            need16(packet->grehdr.gre_flags, payload, length);
-            need16(packet->grehdr.ether_type, payload, length);
-            packet->state       = PCAP_THREAD_PACKET_OK;
-            packet->have_grehdr = 1;
-
-            if (pcaplist->pcap_thread->callback_gre)
-                pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
-            else
-                pcap_thread_callback_gre((void*)pcaplist, packet, payload, length);
-            return;
-
-        case IPPROTO_UDP:
-            if (packet->have_udphdr)
-                break;
-
-            packet->state = PCAP_THREAD_PACKET_INVALID_UDP;
-            need16(packet->udphdr.uh_sport, payload, length);
-            need16(packet->udphdr.uh_dport, payload, length);
-            need16(packet->udphdr.uh_ulen, payload, length);
-            need16(packet->udphdr.uh_sum, payload, length);
-            packet->state       = PCAP_THREAD_PACKET_OK;
-            packet->have_udphdr = 1;
-
-            if (pcaplist->pcap_thread->callback_udp)
-                pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
-            else
-                pcap_thread_callback_udp((void*)pcaplist, packet, payload, length);
-            return;
-
-        case IPPROTO_TCP:
-            if (packet->have_tcphdr)
-                break;
-
-            packet->state = PCAP_THREAD_PACKET_INVALID_TCP;
-            need16(packet->tcphdr.th_sport, payload, length);
-            need16(packet->tcphdr.th_dport, payload, length);
-            need32(packet->tcphdr.th_seq, payload, length);
-            need32(packet->tcphdr.th_ack, payload, length);
-            need4x2(packet->tcphdr.th_off, packet->tcphdr.th_x2, payload, length);
-            need8(packet->tcphdr.th_flags, payload, length);
-            need16(packet->tcphdr.th_win, payload, length);
-            need16(packet->tcphdr.th_sum, payload, length);
-            need16(packet->tcphdr.th_urp, payload, length);
-            packet->state       = PCAP_THREAD_PACKET_OK;
-            packet->have_tcphdr = 1;
-
-            if (pcaplist->pcap_thread->callback_tcp)
-                pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
-            else
-                pcap_thread_callback_tcp((void*)pcaplist, packet, payload, length);
-            return;
-
-        default:
-            packet->state = PCAP_THREAD_PACKET_UNSUPPORTED;
+            }
             break;
         }
     }
@@ -1938,6 +2606,338 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
         if (packet->state == PCAP_THREAD_PACKET_OK)
             packet->state = PCAP_THREAD_PACKET_INVALID;
         pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+
+    if (release_frag) {
+        if (pcaplist->pcap_thread->callback_ipv6_frag_release)
+            pcaplist->pcap_thread->callback_ipv6_frag_release(pcaplist->user, packet, payload, length);
+        else
+            pcap_thread_callback_ipv6_frag_release((void*)pcaplist, packet, payload, length);
+    }
+}
+
+static pcap_thread_packet_state_t pcap_thread_callback_ipv6_frag(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length)
+{
+    pcap_thread_pcaplist_t*     pcaplist = (pcap_thread_pcaplist_t*)user;
+    pcap_thread_packet_frags_t *frags, *frags_prev;
+    pcap_thread_packet_frag_t * frag, *f, *f_prev;
+
+    if (!pcaplist) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!pcaplist->pcap_thread) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!packet) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!payload) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!length) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!whole_packet) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!whole_payload) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!whole_length) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!packet->have_ip6hdr) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+    if (!packet->have_ip6frag) {
+        return PCAP_THREAD_PACKET_INVALID;
+    }
+
+#ifdef HAVE_PTHREAD
+    if (pthread_mutex_lock(&(pcaplist->ipv6_fragments_mutex))) {
+        return PCAP_THREAD_PACKET_EMUTEX;
+    }
+#endif
+
+    /* Find packet fragments */
+    for (frags_prev = 0, frags = pcaplist->ipv6_fragments; frags; frags_prev = frags, frags = frags->next) {
+        if (packet->ip6frag.ip6f_ident == frags->packet.ip6frag.ip6f_ident
+            && !memcmp(&(packet->ip6hdr.ip6_src), &(frags->packet.ip6hdr.ip6_src), sizeof(struct in6_addr))
+            && ((!packet->have_ip6rtdst && !memcmp(&(packet->ip6hdr.ip6_dst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr)))
+                   || (packet->have_ip6rtdst && !memcmp(&(packet->ip6rtdst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr))))) {
+
+            layer_tracef("frag %x found", packet->ip6frag.ip6f_ident);
+
+            /* Found it, remove from list */
+            if (frags_prev) {
+                frags_prev->next = frags->next;
+            }
+            if (pcaplist->ipv6_fragments == frags) {
+                pcaplist->ipv6_fragments = frags->next;
+            }
+            frags->next = 0;
+            break;
+        }
+    }
+
+    /* No fragments found, create new */
+    if (!frags) {
+        if (pcaplist->num_ipv6_fragments >= pcaplist->pcap_thread->max_ipv6_fragments) {
+#ifdef HAVE_PTHREAD
+            pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+            layer_trace("too many frags");
+            return PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS;
+        }
+
+        if (!(frags = calloc(1, sizeof(pcap_thread_packet_frags_t)))) {
+#ifdef HAVE_PTHREAD
+            pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+            layer_trace("nomem frag");
+            return PCAP_THREAD_PACKET_NOMEM;
+        }
+
+        layer_tracef("new frag %x", packet->ip6frag.ip6f_ident);
+
+        // TODO: How to handle prevpkt
+        memcpy(&(frags->packet.ip6hdr), &(packet->ip6hdr), sizeof(struct ip6_hdr));
+        frags->packet.have_ip6hdr = 1;
+        memcpy(&(frags->packet.ip6frag), &(packet->ip6frag), sizeof(struct ip6_frag));
+        frags->packet.have_ip6frag    = 1;
+        frags->packet.ip6frag_payload = packet->ip6frag_payload;
+        if (packet->have_ip6rtdst) {
+            frags->packet.ip6hdr.ip6_dst = packet->ip6rtdst;
+        }
+        pcaplist->num_ipv6_fragments++;
+    } else {
+        if (frags->packet.ip6frag_payload != packet->ip6frag_payload) {
+#ifdef HAVE_PTHREAD
+            pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+            layer_trace("wrong payload");
+            return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+        }
+    }
+
+    /* Put the fragments first on the list */
+    frags->next              = pcaplist->ipv6_fragments;
+    pcaplist->ipv6_fragments = frags;
+
+    if (frags->payload) {
+/* Already reassembled */
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+        layer_trace("invalid frags");
+        return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+    }
+
+    if (frags->num_fragments >= pcaplist->pcap_thread->max_ipv6_fragments_per_packet) {
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+        layer_trace("too many frags");
+        return PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS;
+    }
+
+    /* Allocate for the new fragment */
+    if (!(frag = calloc(1, sizeof(pcap_thread_packet_frag_t)))) {
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+        layer_trace("nomem frag");
+        return PCAP_THREAD_PACKET_NOMEM;
+    }
+    if (!(frag->payload = calloc(1, length))) {
+        free(frag);
+#ifdef HAVE_PTHREAD
+        pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+        layer_trace("nomem frag");
+        return PCAP_THREAD_PACKET_NOMEM;
+    }
+    memcpy(frag->payload, payload, length);
+    frag->length              = length;
+    frag->offset              = ((packet->ip6frag.ip6f_offlg & 0xfff8) >> 3) * 8;
+    frag->flag_more_fragments = packet->ip6frag.ip6f_offlg & 0x1 ? 1 : 0;
+    layer_tracef("new frag len %lu off %lu mf %d", frag->length, frag->offset, frag->flag_more_fragments);
+
+    /* Place the fragment in the fragments list, order of offset */
+    for (f_prev = 0, f = frags->fragments; f; f_prev = f, f = f->next) {
+        if (f->offset > frag->offset) {
+            if (f_prev) {
+                f_prev->next = frag;
+            } else {
+                frags->fragments = frag;
+            }
+            frag->next = f;
+            break;
+        }
+    }
+    if (!f) {
+        if (f_prev) {
+            f_prev->next = frag;
+        } else {
+            frag->next       = frags->fragments;
+            frags->fragments = frag;
+        }
+    }
+    frags->num_fragments++;
+
+    /* Do we have more then one fragment */
+    if (frags->num_fragments > 1) {
+        size_t length = 0;
+
+        /* Check if we have all fragments */
+        for (f_prev = 0, f = frags->fragments; f; f_prev = f, f = f->next) {
+            layer_tracef("checking frag %p len %lu off %lu mf %d next %p", f, f->length, f->offset, f->flag_more_fragments, f->next);
+
+            if (f->next) {
+                /* If there is a next fragment, this should need more fragments */
+                if (!f->flag_more_fragments) {
+#ifdef HAVE_PTHREAD
+                    pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+                    layer_trace("invalid frags, no need more");
+                    return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+                }
+                /* Check that fragments don't overlay */
+                if (f->offset + f->length > f->next->offset) {
+#ifdef HAVE_PTHREAD
+                    pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+                    layer_trace("invalid frags, overlapping next");
+                    return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+                }
+            }
+
+            if (f_prev) {
+                /* Check that fragments don't overlay */
+                if (f_prev->offset + f_prev->length > f->offset) {
+#ifdef HAVE_PTHREAD
+                    pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+                    layer_trace("invalid frags, prev overlapping");
+                    return PCAP_THREAD_PACKET_INVALID_FRAGMENTS;
+                }
+                /* Check if we are missing fragments */
+                if (f_prev->offset + f_prev->length < f->offset) {
+#ifdef HAVE_PTHREAD
+                    if (pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex))) {
+                        return PCAP_THREAD_PACKET_EMUTEX;
+                    }
+#endif
+                    layer_trace("need more frags, missing next frag");
+                    return PCAP_THREAD_PACKET_OK;
+                }
+            }
+
+            length += f->length;
+        }
+        /* All fragments on the list aligns, check if we have the first and last fragment */
+        if (frags->fragments && !frags->fragments->offset && f_prev && !f_prev->flag_more_fragments) {
+            u_char* p;
+            /* reassemble all fragments */
+            if (!(frags->payload = calloc(1, length))) {
+#ifdef HAVE_PTHREAD
+                pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+                layer_trace("nomem frag");
+                return PCAP_THREAD_PACKET_NOMEM;
+            }
+            frags->length = length;
+            for (p = frags->payload, f = frags->fragments; f; f = f->next) {
+                layer_tracef("%p %p %lu", p, f->payload, f->length);
+                memcpy(p, f->payload, f->length);
+                p = p + f->length;
+            }
+
+            frags->packet.name   = packet->name;
+            frags->packet.dlt    = packet->dlt;
+            frags->packet.pkthdr = packet->pkthdr;
+
+            *whole_packet  = &(frags->packet);
+            *whole_payload = frags->payload;
+            *whole_length  = frags->length;
+        }
+    }
+
+#ifdef HAVE_PTHREAD
+    if (pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex))) {
+        return PCAP_THREAD_PACKET_EMUTEX;
+    }
+#endif
+    return PCAP_THREAD_PACKET_OK;
+}
+
+static void pcap_thread_callback_ipv6_frag_release(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length)
+{
+    pcap_thread_pcaplist_t*     pcaplist = (pcap_thread_pcaplist_t*)user;
+    pcap_thread_packet_frags_t *frags, *frags_prev;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!packet->have_ip6hdr) {
+        return;
+    }
+    if (!packet->have_ip6frag) {
+        return;
+    }
+
+#ifdef HAVE_PTHREAD
+    if (pthread_mutex_lock(&(pcaplist->ipv6_fragments_mutex))) {
+        return;
+    }
+#endif
+
+    /* Find packet fragments */
+    for (frags_prev = 0, frags = pcaplist->ipv6_fragments; frags; frags_prev = frags, frags = frags->next) {
+        if (packet->iphdr.ip_id == frags->packet.iphdr.ip_id
+            && packet->iphdr.ip_p == frags->packet.iphdr.ip_p
+            && packet->iphdr.ip_src.s_addr == frags->packet.iphdr.ip_src.s_addr
+            && packet->iphdr.ip_dst.s_addr == frags->packet.iphdr.ip_dst.s_addr) {
+
+            /* Found it, remove from list */
+            if (frags_prev) {
+                frags_prev->next = frags->next;
+            }
+            if (pcaplist->ipv6_fragments == frags) {
+                pcaplist->ipv6_fragments = frags->next;
+            }
+            frags->next = 0;
+            pcaplist->num_ipv6_fragments--;
+            break;
+        }
+    }
+
+#ifdef HAVE_PTHREAD
+    pthread_mutex_unlock(&(pcaplist->ipv6_fragments_mutex));
+#endif
+
+    if (frags) {
+        pcap_thread_packet_frag_t *frag, *f;
+
+        for (f = frags->fragments; f;) {
+            frag = f;
+            f    = f->next;
+            if (frag->payload) {
+                free(frag->payload);
+            }
+            free(frag);
+        }
+
+        if (frags->payload) {
+            free(frags->payload);
+        }
+        free(frags);
     }
 }
 
@@ -2408,6 +3408,44 @@ int pcap_thread_close(pcap_thread_t* pcap_thread)
         }
         if (pcaplist->name) {
             free(pcaplist->name);
+        }
+        while (pcaplist->ipv4_fragments) {
+            pcap_thread_packet_frags_t* frags = pcaplist->ipv4_fragments;
+            pcaplist->ipv4_fragments          = frags->next;
+
+            while (frags->fragments) {
+                pcap_thread_packet_frag_t* frag = frags->fragments;
+                frags->fragments                = frag->next;
+
+                if (frag->payload) {
+                    free(frag->payload);
+                }
+                free(frag);
+            }
+
+            if (frags->payload) {
+                free(frags->payload);
+            }
+            free(frags);
+        }
+        while (pcaplist->ipv6_fragments) {
+            pcap_thread_packet_frags_t* frags = pcaplist->ipv6_fragments;
+            pcaplist->ipv6_fragments          = frags->next;
+
+            while (frags->fragments) {
+                pcap_thread_packet_frag_t* frag = frags->fragments;
+                frags->fragments                = frag->next;
+
+                if (frag->payload) {
+                    free(frag->payload);
+                }
+                free(frag);
+            }
+
+            if (frags->payload) {
+                free(frags->payload);
+            }
+            free(frags);
         }
         free(pcaplist);
     }

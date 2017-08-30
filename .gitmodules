@@ -1,0 +1,3 @@
+[submodule "hexdump/test/bad-packets"]
+	path = hexdump/test/bad-packets
+	url = https://github.com/DNS-OARC/bad-packets.git
