@@ -88,8 +88,9 @@ void invalid(u_char* user, const pcap_thread_packet_t* packet, const u_char* pay
     }
 
     if (user) {
-        printf("%s name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
+        printf("%s(%d) name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
             packet->state == PCAP_THREAD_PACKET_UNSUPPORTED ? "unsupported" : "invalid",
+            packet->state,
             first->name,
             (long)first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
             first->pkthdr.caplen,
@@ -208,7 +209,7 @@ int main(int argc, char** argv)
         exit(4);
     }
 
-    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:a:vr:H:P:hDVA:c:L:")) != -1) {
+    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:a:vr:H:P:hDVA:c:L:F:")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -377,6 +378,9 @@ int main(int argc, char** argv)
 #endif
                 " -L <layer>         capture at layer: ether, null, loop, ieee802, gre, ip,\n"
                 "                                      ipv4, ipv6, udp or tcp\n"
+                " -F <ip proto>      defragment packets for IP protocol: 4, 6\n"
+                " -F m<ip p><num>    set maximum fragments per IP protocol: 4, 6\n"
+                " -F p<ip p><num>    set maximum packet fragments per IP protocol: 4, 6\n"
                 " -D                 display stats on exit\n"
                 " -V                 display version and exit\n"
                 " -h                 this\n");
@@ -423,6 +427,30 @@ int main(int argc, char** argv)
                 ret = pcap_thread_set_use_layers(&pt, 1);
 
             layers = 1;
+            break;
+        case 'F':
+            if (!strcmp("4", optarg))
+                ret = pcap_thread_set_defrag_ipv4(&pt, 1);
+            else if (!strcmp("6", optarg))
+                ret = pcap_thread_set_defrag_ipv6(&pt, 1);
+            else if (strlen(optarg) > 2 && optarg[0] == 'm') {
+                int max = atoi(&optarg[2]);
+                if (max > 0 && optarg[1] == '4')
+                    pcap_thread_set_max_ipv4_fragments(&pt, max);
+                else if (max > 0 && optarg[1] == '6')
+                    pcap_thread_set_max_ipv6_fragments(&pt, max);
+                else
+                    err = -1;
+            } else if (strlen(optarg) > 2 && optarg[0] == 'p') {
+                int max = atoi(&optarg[2]);
+                if (max > 0 && optarg[1] == '4')
+                    pcap_thread_set_max_ipv4_fragments_per_packet(&pt, max);
+                else if (max > 0 && optarg[1] == '6')
+                    pcap_thread_set_max_ipv6_fragments_per_packet(&pt, max);
+                else
+                    err = -1;
+            } else
+                err = -1;
             break;
         default:
             err = -1;
@@ -513,6 +541,12 @@ int main(int argc, char** argv)
         printf("filter_optimize: %s\n", pcap_thread_filter_optimze(&pt) ? "yes" : "no");
         printf("filter_netmask: 0x%x\n", pcap_thread_filter_netmask(&pt));
         printf("filter: %s\n", filter);
+        printf("defrag_ipv4: %s\n", pcap_thread_defrag_ipv4(&pt) ? "yes" : "no");
+        printf("defrag_ipv6: %s\n", pcap_thread_defrag_ipv6(&pt) ? "yes" : "no");
+        printf("max_ipv4_fragments: %lu\n", pcap_thread_max_ipv4_fragments(&pt));
+        printf("max_ipv4_fragments_per_packet: %lu\n", pcap_thread_max_ipv4_fragments_per_packet(&pt));
+        printf("max_ipv6_fragments: %lu\n", pcap_thread_max_ipv6_fragments(&pt));
+        printf("max_ipv6_fragments_per_packet: %lu\n", pcap_thread_max_ipv6_fragments_per_packet(&pt));
     }
 
     if (exit_after_time) {

@@ -32,6 +32,19 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-../hexdump -r ./dns.pcap-dist >dns.out
-
-diff dns.out "$srcdir/dns.gold"
+for frag in 34 120 890; do
+    for pkt in 900 1120 1240 1400 1800; do
+        cat test3.sh | \
+            sed "s%@FRAG_SIZE@%$frag%g" | \
+            sed "s%@PKT_SIZE@%$pkt%g" \
+            > test3_${frag}_${pkt}.sh
+    done
+done
+for frag in 1255 1400 1600; do
+    for pkt in 2123 2345 2566; do
+        cat test3.sh | \
+            sed "s%@FRAG_SIZE@%$frag%g" | \
+            sed "s%@PKT_SIZE@%$pkt%g" \
+            > test3_${frag}_${pkt}.sh
+    done
+done
