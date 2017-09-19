@@ -193,6 +193,8 @@ enum pcap_thread_packet_state {
     PCAP_THREAD_PACKET_INVALID_IPV4,
     PCAP_THREAD_PACKET_INVALID_IPV6,
     PCAP_THREAD_PACKET_INVALID_IPV6HDR,
+    PCAP_THREAD_PACKET_INVALID_ICMP,
+    PCAP_THREAD_PACKET_INVALID_ICMPV6,
     PCAP_THREAD_PACKET_INVALID_UDP,
     PCAP_THREAD_PACKET_INVALID_TCP,
     PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS,
@@ -216,6 +218,8 @@ struct pcap_thread_packet {
     unsigned short have_ip6hdr : 1;
     unsigned short have_ip6frag : 1;
     unsigned short have_ip6rtdst : 1;
+    unsigned short have_icmphdr : 1;
+    unsigned short have_icmpv6hdr : 1;
     unsigned short have_udphdr : 1;
     unsigned short have_tcphdr : 1;
 
@@ -235,6 +239,16 @@ struct pcap_thread_packet {
     struct ip6_frag                ip6frag;
     uint8_t                        ip6frag_payload;
     struct in6_addr                ip6rtdst;
+    struct {
+        u_int8_t  type;
+        u_int8_t  code;
+        u_int16_t checksum;
+    } icmphdr;
+    struct {
+        u_int8_t  icmp6_type;
+        u_int8_t  icmp6_code;
+        u_int16_t icmp6_cksum;
+    } icmpv6hdr;
     struct {
         union {
             struct {
@@ -388,7 +402,7 @@ enum pcap_thread_activate_mode {
     0, "", 0, 0, \
     { 0, 0 }, { 0, 0 }, \
     PCAP_THREAD_DEFAULT_ACTIVATE_MODE, \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0 \
 }
 /* clang-format on */
@@ -473,6 +487,8 @@ struct pcap_thread {
     pcap_thread_layer_callback_t      callback_ipv6;
     pcap_thread_layer_callback_frag_t callback_ipv6_frag;
     pcap_thread_layer_callback_t      callback_ipv6_frag_release;
+    pcap_thread_layer_callback_t      callback_icmp;
+    pcap_thread_layer_callback_t      callback_icmpv6;
     pcap_thread_layer_callback_t      callback_udp;
     pcap_thread_layer_callback_t      callback_tcp;
 
@@ -617,6 +633,8 @@ int pcap_thread_set_callback_ipv4(pcap_thread_t* pcap_thread, pcap_thread_layer_
 int pcap_thread_set_callback_ipv4_frag(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_frag_t callback_ipv4_frag, pcap_thread_layer_callback_t callback_ipv4_frag_release);
 int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ipv6);
 int pcap_thread_set_callback_ipv6_frag(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_frag_t callback_ipv6_frag, pcap_thread_layer_callback_t callback_ipv6_frag_release);
+int pcap_thread_set_callback_icmp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_icmp);
+int pcap_thread_set_callback_icmpv6(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_icmpv6);
 int pcap_thread_set_callback_udp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_udp);
 int pcap_thread_set_callback_tcp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_tcp);
 int pcap_thread_set_callback_invalid(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_tcp);

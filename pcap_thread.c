@@ -60,6 +60,8 @@ static void pcap_thread_callback_ipv4_frag_release(u_char* user, pcap_thread_pac
 static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static pcap_thread_packet_state_t pcap_thread_callback_ipv6_frag(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length);
 static void pcap_thread_callback_ipv6_frag_release(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_icmp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void pcap_thread_callback_icmpv6(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_udp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 static void pcap_thread_callback_tcp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 
@@ -863,6 +865,8 @@ int pcap_thread_set_callback_linux_sll(pcap_thread_t* pcap_thread, pcap_thread_l
         || pcap_thread->callback_ip
         || pcap_thread->callback_ipv4
         || pcap_thread->callback_ipv6
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -889,6 +893,8 @@ int pcap_thread_set_callback_ether(pcap_thread_t* pcap_thread, pcap_thread_layer
         || pcap_thread->callback_ip
         || pcap_thread->callback_ipv4
         || pcap_thread->callback_ipv6
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -915,6 +921,8 @@ int pcap_thread_set_callback_null(pcap_thread_t* pcap_thread, pcap_thread_layer_
         || pcap_thread->callback_ip
         || pcap_thread->callback_ipv4
         || pcap_thread->callback_ipv6
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -941,6 +949,8 @@ int pcap_thread_set_callback_loop(pcap_thread_t* pcap_thread, pcap_thread_layer_
         || pcap_thread->callback_ip
         || pcap_thread->callback_ipv4
         || pcap_thread->callback_ipv6
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -967,6 +977,8 @@ int pcap_thread_set_callback_ieee802(pcap_thread_t* pcap_thread, pcap_thread_lay
         || pcap_thread->callback_ip
         || pcap_thread->callback_ipv4
         || pcap_thread->callback_ipv6
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -993,6 +1005,8 @@ int pcap_thread_set_callback_gre(pcap_thread_t* pcap_thread, pcap_thread_layer_c
         || pcap_thread->callback_ip
         || pcap_thread->callback_ipv4
         || pcap_thread->callback_ipv6
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -1019,6 +1033,8 @@ int pcap_thread_set_callback_ip(pcap_thread_t* pcap_thread, pcap_thread_layer_ca
         || pcap_thread->callback_gre
         || pcap_thread->callback_ipv4
         || pcap_thread->callback_ipv6
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -1044,6 +1060,8 @@ int pcap_thread_set_callback_ipv4(pcap_thread_t* pcap_thread, pcap_thread_layer_
         || pcap_thread->callback_ieee802
         || pcap_thread->callback_gre
         || pcap_thread->callback_ip
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -1088,6 +1106,8 @@ int pcap_thread_set_callback_ipv6(pcap_thread_t* pcap_thread, pcap_thread_layer_
         || pcap_thread->callback_ieee802
         || pcap_thread->callback_gre
         || pcap_thread->callback_ip
+        || pcap_thread->callback_icmp
+        || pcap_thread->callback_icmpv6
         || pcap_thread->callback_udp
         || pcap_thread->callback_tcp) {
         return PCAP_THREAD_ELAYERCB;
@@ -1116,6 +1136,56 @@ int pcap_thread_set_callback_ipv6_frag(pcap_thread_t* pcap_thread, pcap_thread_l
 
     pcap_thread->callback_ipv6_frag         = callback_ipv6_frag;
     pcap_thread->callback_ipv6_frag_release = callback_ipv6_frag_release;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_icmp(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_icmp)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6) {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_icmp = callback_icmp;
+
+    return PCAP_THREAD_OK;
+}
+
+int pcap_thread_set_callback_icmpv6(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_icmpv6)
+{
+    if (!pcap_thread) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (pcap_thread->callback_linux_sll
+        || pcap_thread->callback_ether
+        || pcap_thread->callback_null
+        || pcap_thread->callback_loop
+        || pcap_thread->callback_ieee802
+        || pcap_thread->callback_gre
+        || pcap_thread->callback_ip
+        || pcap_thread->callback_ipv4
+        || pcap_thread->callback_ipv6) {
+        return PCAP_THREAD_ELAYERCB;
+    }
+    if (pcap_thread->running) {
+        return PCAP_THREAD_ERUNNING;
+    }
+
+    pcap_thread->callback_icmpv6 = callback_icmpv6;
 
     return PCAP_THREAD_OK;
 }
@@ -1972,6 +2042,32 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                 }
                 return;
 
+            case IPPROTO_ICMP:
+                layer_trace("ipproto_icmp");
+
+                if (packet->have_icmphdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_ICMP;
+                need8(packet->icmphdr.type, payload, length);
+                need8(packet->icmphdr.code, payload, length);
+                need16(packet->icmphdr.checksum, payload, length);
+                packet->state        = PCAP_THREAD_PACKET_OK;
+                packet->have_icmphdr = 1;
+
+                if (pcaplist->pcap_thread->callback_icmp)
+                    pcaplist->pcap_thread->callback_icmp(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_icmp((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv4_frag_release)
+                        pcaplist->pcap_thread->callback_ipv4_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv4_frag_release((void*)pcaplist, packet, payload, length);
+                }
+                return;
+
             case IPPROTO_UDP:
                 layer_trace("ipproto_udp");
 
@@ -2391,6 +2487,7 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
         ext.ip6e_len = 0;
         while (ext.ip6e_nxt != IPPROTO_NONE
                && ext.ip6e_nxt != IPPROTO_GRE
+               && ext.ip6e_nxt != IPPROTO_ICMPV6
                && ext.ip6e_nxt != IPPROTO_UDP
                && ext.ip6e_nxt != IPPROTO_TCP) {
             packet->state = PCAP_THREAD_PACKET_INVALID_IPV6HDR;
@@ -2530,6 +2627,32 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
                     pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
                 else
                     pcap_thread_callback_gre((void*)pcaplist, packet, payload, length);
+
+                if (release_frag) {
+                    if (pcaplist->pcap_thread->callback_ipv6_frag_release)
+                        pcaplist->pcap_thread->callback_ipv6_frag_release(pcaplist->user, packet, payload, length);
+                    else
+                        pcap_thread_callback_ipv6_frag_release((void*)pcaplist, packet, payload, length);
+                }
+                return;
+
+            case IPPROTO_ICMPV6:
+                layer_trace("ipproto_icmpv6");
+
+                if (packet->have_icmpv6hdr)
+                    break;
+
+                packet->state = PCAP_THREAD_PACKET_INVALID_ICMPV6;
+                need8(packet->icmpv6hdr.icmp6_type, payload, length);
+                need8(packet->icmpv6hdr.icmp6_code, payload, length);
+                need16(packet->icmpv6hdr.icmp6_cksum, payload, length);
+                packet->state          = PCAP_THREAD_PACKET_OK;
+                packet->have_icmpv6hdr = 1;
+
+                if (pcaplist->pcap_thread->callback_icmpv6)
+                    pcaplist->pcap_thread->callback_icmpv6(pcaplist->user, packet, payload, length);
+                else
+                    pcap_thread_callback_icmpv6((void*)pcaplist, packet, payload, length);
 
                 if (release_frag) {
                     if (pcaplist->pcap_thread->callback_ipv6_frag_release)
@@ -2938,6 +3061,70 @@ static void pcap_thread_callback_ipv6_frag_release(u_char* user, pcap_thread_pac
             free(frags->payload);
         }
         free(frags);
+    }
+}
+
+static void pcap_thread_callback_icmp(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length)
+{
+    pcap_thread_pcaplist_t* pcaplist   = (pcap_thread_pcaplist_t*)user;
+    const u_char*           orig       = payload;
+    size_t                  origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    /* TODO: Higher layer support? */
+    packet->state = PCAP_THREAD_PACKET_UNPROCESSED;
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+    }
+}
+
+static void pcap_thread_callback_icmpv6(u_char* user, pcap_thread_packet_t* packet, const u_char* payload, size_t length)
+{
+    pcap_thread_pcaplist_t* pcaplist   = (pcap_thread_pcaplist_t*)user;
+    const u_char*           orig       = payload;
+    size_t                  origlength = length;
+
+    if (!pcaplist) {
+        return;
+    }
+    if (!pcaplist->pcap_thread) {
+        return;
+    }
+    if (!packet) {
+        return;
+    }
+    if (!payload) {
+        return;
+    }
+    if (!length) {
+        return;
+    }
+
+    /* TODO: Higher layer support? */
+    packet->state = PCAP_THREAD_PACKET_UNPROCESSED;
+
+    if (pcaplist->pcap_thread->callback_invalid) {
+        if (packet->state == PCAP_THREAD_PACKET_OK)
+            packet->state = PCAP_THREAD_PACKET_INVALID;
+        pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
     }
 }
 
@@ -3638,6 +3825,8 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
                || pcap_thread->callback_ip
                || pcap_thread->callback_ipv4
                || pcap_thread->callback_ipv6
+               || pcap_thread->callback_icmp
+               || pcap_thread->callback_icmpv6
                || pcap_thread->callback_udp
                || pcap_thread->callback_tcp)) {
         return PCAP_THREAD_NOCALLBACK;
@@ -3973,6 +4162,8 @@ int pcap_thread_next(pcap_thread_t* pcap_thread)
                || pcap_thread->callback_ip
                || pcap_thread->callback_ipv4
                || pcap_thread->callback_ipv6
+               || pcap_thread->callback_icmp
+               || pcap_thread->callback_icmpv6
                || pcap_thread->callback_udp
                || pcap_thread->callback_tcp)) {
         return PCAP_THREAD_NOCALLBACK;
