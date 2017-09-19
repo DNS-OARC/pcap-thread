@@ -377,7 +377,7 @@ int main(int argc, char** argv)
                 " -P <type>          timestamp precision: micro or nano\n"
 #endif
                 " -L <layer>         capture at layer: ether, null, loop, ieee802, gre, ip,\n"
-                "                                      ipv4, ipv6, udp or tcp\n"
+                "                                      ipv4, ipv6, icmp, icmpv6, udp or tcp\n"
                 " -F <ip proto>      defragment packets for IP protocol: 4, 6\n"
                 " -F m<ip p><num>    set maximum fragments per IP protocol: 4, 6\n"
                 " -F p<ip p><num>    set maximum packet fragments per IP protocol: 4, 6\n"
@@ -416,6 +416,10 @@ int main(int argc, char** argv)
                 ret = pcap_thread_set_callback_ipv4(&pt, &layer);
             else if (!strcmp("ipv6", optarg))
                 ret = pcap_thread_set_callback_ipv6(&pt, &layer);
+            else if (!strcmp("icmp", optarg))
+                ret = pcap_thread_set_callback_icmp(&pt, &layer);
+            else if (!strcmp("icmpv6", optarg))
+                ret = pcap_thread_set_callback_icmpv6(&pt, &layer);
             else if (!strcmp("udp", optarg))
                 ret = pcap_thread_set_callback_udp(&pt, &layer);
             else if (!strcmp("tcp", optarg))
