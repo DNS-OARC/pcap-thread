@@ -1984,36 +1984,81 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
         for (;;) {
             /* Check if packet wants more fragments or has an offset */
             if (packet->iphdr.ip_off & 0x2000 || packet->iphdr.ip_off & 0x1fff) {
-                pcap_thread_packet_t*      whole_packet  = 0;
-                const u_char*              whole_payload = 0;
-                size_t                     whole_length  = 0;
-                pcap_thread_packet_state_t state;
-
                 layer_trace("is_v4_frag");
 
-                if (pcaplist->pcap_thread->callback_ipv4_frag)
-                    state = pcaplist->pcap_thread->callback_ipv4_frag(pcaplist->user, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
-                else if (pcaplist->pcap_thread->defrag_ipv4)
-                    state = pcap_thread_callback_ipv4_frag((void*)pcaplist, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
-                else {
-                    state = PCAP_THREAD_PACKET_UNSUPPORTED;
-                }
+                if (pcaplist->pcap_thread->defrag_ipv4) {
+                    pcap_thread_packet_t*      whole_packet  = 0;
+                    const u_char*              whole_payload = 0;
+                    size_t                     whole_length  = 0;
+                    pcap_thread_packet_state_t state;
 
-                if (state != PCAP_THREAD_PACKET_OK) {
-                    // TODO: Only last packet will be invalid, can we invalidate the others?
+                    if (pcaplist->pcap_thread->callback_ipv4_frag)
+                        state = pcaplist->pcap_thread->callback_ipv4_frag(pcaplist->user, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+                    else
+                        state = pcap_thread_callback_ipv4_frag((void*)pcaplist, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+
+                    if (state != PCAP_THREAD_PACKET_OK) {
+                        packet->state = state;
+                        break;
+                    }
+
+                    if (!whole_packet) {
+                        return;
+                    }
+
+                    layer_tracef("v4_reasm %p %p %lu", whole_packet, whole_payload, whole_length);
+
+                    packet       = whole_packet;
+                    payload      = whole_payload;
+                    length       = whole_length;
+                    release_frag = 1;
+                } else {
+                    packet->state = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                }
+            }
+
+            if (packet->state == PCAP_THREAD_PACKET_IS_FRAGMENT) {
+                switch (packet->iphdr.ip_p) {
+                case IPPROTO_GRE:
+                    layer_trace("ipproto_gre");
+
+                    if (pcaplist->pcap_thread->callback_gre) {
+                        pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                case IPPROTO_ICMP:
+                    layer_trace("ipproto_icmp");
+
+                    if (pcaplist->pcap_thread->callback_icmp) {
+                        pcaplist->pcap_thread->callback_icmp(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                case IPPROTO_UDP:
+                    layer_trace("ipproto_udp");
+
+                    if (pcaplist->pcap_thread->callback_udp) {
+                        pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                case IPPROTO_TCP:
+                    layer_trace("ipproto_tcp");
+
+                    if (pcaplist->pcap_thread->callback_tcp) {
+                        pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                default:
                     break;
                 }
-
-                if (!whole_packet) {
-                    return;
-                }
-
-                layer_tracef("v4_reasm %p %p %lu", whole_packet, whole_payload, whole_length);
-
-                packet       = whole_packet;
-                payload      = whole_payload;
-                length       = whole_length;
-                release_frag = 1;
+                break;
             }
 
             switch (packet->iphdr.ip_p) {
@@ -2364,7 +2409,6 @@ static pcap_thread_packet_state_t pcap_thread_callback_ipv4_frag(u_char* user, p
             }
             frags->length = length;
             for (p = frags->payload, f = frags->fragments; f; f = f->next) {
-                layer_tracef("%p %p %lu", p, f->payload, f->length);
                 memcpy(p, f->payload, f->length);
                 p = p + f->length;
             }
@@ -2527,16 +2571,8 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
                 need16(packet->ip6frag.ip6f_offlg, payload, length);
                 need32(packet->ip6frag.ip6f_ident, payload, length);
                 packet->have_ip6frag = 1;
-
-                layer_tracef("ip6frag r %02x off %02x/%d flag %02x m %d id %04x",
-                    packet->ip6frag.ip6f_reserved,
-                    (packet->ip6frag.ip6f_offlg & 0xfff8) >> 3,
-                    ((packet->ip6frag.ip6f_offlg & 0xfff8) >> 3) * 8,
-                    packet->ip6frag.ip6f_offlg & 0x6,
-                    packet->ip6frag.ip6f_offlg & 0x1,
-                    packet->ip6frag.ip6f_ident);
-                ext.ip6e_len     = 1;
-                already_advanced = 1;
+                ext.ip6e_len         = 1;
+                already_advanced     = 1;
             } else if (ext.ip6e_nxt == IPPROTO_ROUTING) {
                 struct ip6_rthdr rthdr;
                 struct in6_addr  rt[255];
@@ -2578,38 +2614,83 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
 
         for (; packet->state == PCAP_THREAD_PACKET_OK;) {
             if (packet->have_ip6frag) {
-                pcap_thread_packet_t*      whole_packet  = 0;
-                const u_char*              whole_payload = 0;
-                size_t                     whole_length  = 0;
-                pcap_thread_packet_state_t state;
-
                 packet->ip6frag_payload = ext.ip6e_nxt;
 
                 layer_trace("is_v6_frag");
 
-                if (pcaplist->pcap_thread->callback_ipv6_frag)
-                    state = pcaplist->pcap_thread->callback_ipv6_frag(pcaplist->user, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
-                else if (pcaplist->pcap_thread->defrag_ipv6)
-                    state = pcap_thread_callback_ipv6_frag((void*)pcaplist, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
-                else {
-                    state = PCAP_THREAD_PACKET_UNSUPPORTED;
-                }
+                if (pcaplist->pcap_thread->defrag_ipv6) {
+                    pcap_thread_packet_t*      whole_packet  = 0;
+                    const u_char*              whole_payload = 0;
+                    size_t                     whole_length  = 0;
+                    pcap_thread_packet_state_t state;
 
-                if (state != PCAP_THREAD_PACKET_OK) {
-                    // TODO: Only last packet will be invalid, can we invalidate the others?
+                    if (pcaplist->pcap_thread->callback_ipv6_frag)
+                        state = pcaplist->pcap_thread->callback_ipv6_frag(pcaplist->user, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+                    else
+                        state = pcap_thread_callback_ipv6_frag((void*)pcaplist, packet, payload, length, &whole_packet, &whole_payload, &whole_length);
+
+                    if (state != PCAP_THREAD_PACKET_OK) {
+                        packet->state = state;
+                        break;
+                    }
+
+                    if (!whole_packet) {
+                        return;
+                    }
+
+                    layer_tracef("v6_reasm %p %p %lu", whole_packet, whole_payload, whole_length);
+
+                    packet       = whole_packet;
+                    payload      = whole_payload;
+                    length       = whole_length;
+                    release_frag = 1;
+                } else {
+                    packet->state = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                }
+            }
+
+            if (packet->state == PCAP_THREAD_PACKET_IS_FRAGMENT) {
+                switch (ext.ip6e_nxt) {
+                case IPPROTO_GRE:
+                    layer_trace("ipproto_gre");
+
+                    if (pcaplist->pcap_thread->callback_gre) {
+                        pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                case IPPROTO_ICMPV6:
+                    layer_trace("ipproto_icmpv6");
+
+                    if (pcaplist->pcap_thread->callback_icmpv6) {
+                        pcaplist->pcap_thread->callback_icmpv6(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                case IPPROTO_UDP:
+                    layer_trace("ipproto_udp");
+
+                    if (pcaplist->pcap_thread->callback_udp) {
+                        pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                case IPPROTO_TCP:
+                    layer_trace("ipproto_tcp");
+
+                    if (pcaplist->pcap_thread->callback_tcp) {
+                        pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
+                        return;
+                    }
+                    break;
+
+                default:
                     break;
                 }
-
-                if (!whole_packet) {
-                    return;
-                }
-
-                layer_tracef("v6_reasm %p %p %lu", whole_packet, whole_payload, whole_length);
-
-                packet       = whole_packet;
-                payload      = whole_payload;
-                length       = whole_length;
-                release_frag = 1;
+                break;
             }
 
             switch (ext.ip6e_nxt) {
@@ -2971,7 +3052,6 @@ static pcap_thread_packet_state_t pcap_thread_callback_ipv6_frag(u_char* user, p
             }
             frags->length = length;
             for (p = frags->payload, f = frags->fragments; f; f = f->next) {
-                layer_tracef("%p %p %lu", p, f->payload, f->length);
                 memcpy(p, f->payload, f->length);
                 p = p + f->length;
             }
