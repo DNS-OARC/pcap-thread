@@ -200,7 +200,8 @@ enum pcap_thread_packet_state {
     PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS,
     PCAP_THREAD_PACKET_INVALID_FRAGMENTS,
     PCAP_THREAD_PACKET_NOMEM,
-    PCAP_THREAD_PACKET_EMUTEX
+    PCAP_THREAD_PACKET_EMUTEX,
+    PCAP_THREAD_PACKET_IS_FRAGMENT
 };
 
 typedef struct pcap_thread_packet pcap_thread_packet_t;

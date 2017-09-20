@@ -63,14 +63,17 @@ void layer(u_char* user, const pcap_thread_packet_t* packet, const u_char* paylo
     }
 
     if (user) {
-        printf("name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
+        printf("name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s %sdata:",
             first->name,
             (long)first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
             first->pkthdr.caplen,
             first->pkthdr.len,
-            pcap_datalink_val_to_name(first->dlt));
+            pcap_datalink_val_to_name(first->dlt),
+            packet->state == PCAP_THREAD_PACKET_IS_FRAGMENT ? "fragment " : "");
     } else {
-        printf("%s ", first->name);
+        printf("%s%s ",
+            packet->state == PCAP_THREAD_PACKET_IS_FRAGMENT ? "#" : "",
+            first->name);
     }
     for (n = 0; n < length; n++) {
         printf("%02x", payload[n]);
@@ -82,14 +85,90 @@ void invalid(u_char* user, const pcap_thread_packet_t* packet, const u_char* pay
 {
     const pcap_thread_packet_t* first = packet;
     size_t                      n;
+    const char*                 state;
 
     while (first->have_prevpkt) {
         first = first->prevpkt;
     }
 
+    switch (packet->state) {
+    case PCAP_THREAD_PACKET_OK:
+        state = user ? "OK" : "";
+        break;
+    case PCAP_THREAD_PACKET_INVALID:
+        state = user ? "invalid" : "-";
+        break;
+    case PCAP_THREAD_PACKET_UNSUPPORTED:
+        state = user ? "unsupported" : "?";
+        break;
+    case PCAP_THREAD_PACKET_UNPROCESSED:
+        state = user ? "unprocessed" : "?";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_ETHER:
+        state = user ? "invalid ether" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_LINUX_SLL:
+        state = user ? "invalid linux ssl" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_NULL:
+        state = user ? "invalid null" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_LOOP:
+        state = user ? "invalid loop" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_IEEE802:
+        state = user ? "invalid ieee802" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_GRE:
+        state = user ? "invalid gre" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_IP:
+        state = user ? "invalid ip" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_IPV4:
+        state = user ? "invalid ipv4" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_IPV6:
+        state = user ? "invalid ipv6" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_IPV6HDR:
+        state = user ? "invalid ipv6hdr" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_ICMP:
+        state = user ? "invalid icmp" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_ICMPV6:
+        state = user ? "invalid icmpv6" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_UDP:
+        state = user ? "invalid udp" : "-";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_TCP:
+        state = user ? "invalid tcp" : "-";
+        break;
+    case PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS:
+        state = user ? "too many fragments" : "#";
+        break;
+    case PCAP_THREAD_PACKET_INVALID_FRAGMENTS:
+        state = user ? "invalid fragments" : "#";
+        break;
+    case PCAP_THREAD_PACKET_NOMEM:
+        state = user ? "nomem" : "!";
+        break;
+    case PCAP_THREAD_PACKET_EMUTEX:
+        state = user ? "mutex" : "!";
+        break;
+    case PCAP_THREAD_PACKET_IS_FRAGMENT:
+        state = user ? "is fragment" : "#";
+        break;
+    default:
+        state = user ? "UNKNOWN" : "???";
+        break;
+    }
+
     if (user) {
         printf("%s(%d) name:%s ts:%ld.%ld caplen:%d len:%d datalink:%s data:",
-            packet->state == PCAP_THREAD_PACKET_UNSUPPORTED ? "unsupported" : "invalid",
+            state,
             packet->state,
             first->name,
             (long)first->pkthdr.ts.tv_sec, first->pkthdr.ts.tv_usec,
@@ -97,9 +176,7 @@ void invalid(u_char* user, const pcap_thread_packet_t* packet, const u_char* pay
             first->pkthdr.len,
             pcap_datalink_val_to_name(first->dlt));
     } else {
-        printf("%c%s ",
-            packet->state == PCAP_THREAD_PACKET_UNSUPPORTED ? '?' : '-',
-            first->name);
+        printf("%s%s ", state, first->name);
     }
     for (n = 0; n < length; n++) {
         printf("%02x", payload[n]);

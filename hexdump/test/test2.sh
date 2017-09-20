@@ -42,4 +42,12 @@ for file in v4_frag_dup.pcap-dist v4_frag_empty.pcap-dist \
         ../hexdump -F 4 -F p4100 -L udp -v -r "$file" >>test2.out
 done
 
+for file in v4_frag_dup.pcap-dist v4_frag_empty.pcap-dist \
+    v4_frag_nomf.pcap-dist v4_frag_offset_offbyone1.pcap-dist \
+    v4_frag_offset_offbyone2.pcap-dist v4_frag_order.pcap-dist \
+    v4_frag_skip_first.pcap-dist v4_frag_skip_last.pcap-dist \
+    v4_frag_skip_middle.pcap-dist; do
+        ../hexdump -L udp -v -r "$file" >>test2.out
+done
+
 diff test2.out "$srcdir/test2.gold"
