@@ -4143,7 +4143,10 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
                 return PCAP_THREAD_EPCAP;
             }
             pcaplist->pcap_thread = pcap_thread;
-            pcaplist->running     = 1;
+            if (pcap_thread->use_layers) {
+                pcaplist->layer_callback = &pcap_thread_callback;
+            }
+            pcaplist->running = 1;
         }
 
         t1.tv_sec  = pcap_thread->timeout / 1000;
