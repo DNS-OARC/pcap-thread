@@ -42,6 +42,10 @@
 #include <string.h>
 #include <sys/select.h>
 
+#ifndef PCAP_THREAD_LAYER_TRACE
+#define PCAP_THREAD_LAYER_TRACE 0
+#endif
+
 /*
  * Forward declares for layer callbacks
  */
@@ -1302,7 +1306,7 @@ int pcap_thread_set_callback_invalid(pcap_thread_t* pcap_thread, pcap_thread_lay
     p += x;                \
     l -= x
 
-#if 0
+#if PCAP_THREAD_LAYER_TRACE
 #define layer_trace(msg) printf("LT %s:%d: " msg "\n", __FILE__, __LINE__)
 #define layer_tracef(msg, args...) printf("LT %s:%d: " msg "\n", __FILE__, __LINE__, args)
 #else
@@ -1898,8 +1902,8 @@ static void pcap_thread_callback_ip(u_char* user, pcap_thread_packet_t* packet, 
                 need8(packet->iphdr.ip_ttl, payload, length);
                 need8(packet->iphdr.ip_p, payload, length);
                 need16(packet->iphdr.ip_sum, payload, length);
-                need32(packet->iphdr.ip_src.s_addr, payload, length);
-                need32(packet->iphdr.ip_dst.s_addr, payload, length);
+                needxb(&(packet->iphdr.ip_src.s_addr), 4, payload, length);
+                needxb(&(packet->iphdr.ip_dst.s_addr), 4, payload, length);
 
                 /* TODO: IPv4 options */
 
