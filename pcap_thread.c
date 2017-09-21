@@ -1898,8 +1898,8 @@ static void pcap_thread_callback_ip(u_char* user, pcap_thread_packet_t* packet, 
                 need8(packet->iphdr.ip_ttl, payload, length);
                 need8(packet->iphdr.ip_p, payload, length);
                 need16(packet->iphdr.ip_sum, payload, length);
-                need32(packet->iphdr.ip_src.s_addr, payload, length);
-                need32(packet->iphdr.ip_dst.s_addr, payload, length);
+                needxb(&(packet->iphdr.ip_src.s_addr), 4, payload, length);
+                needxb(&(packet->iphdr.ip_dst.s_addr), 4, payload, length);
 
                 /* TODO: IPv4 options */
 
