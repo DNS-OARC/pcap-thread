@@ -34,7 +34,11 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = test*.log test*.trs \
-    *.pcap-dist dns.out
+    *.pcap-dist \
+    dns.out \
+    test2.out \
+    test4.out \
+    test5.out
 
 TESTS = test1.sh test2.sh \
     test3_120_1120.sh test3_120_1240.sh test3_120_1400.sh test3_120_1800.sh \
