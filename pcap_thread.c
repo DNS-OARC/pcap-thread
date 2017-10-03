@@ -2403,6 +2403,8 @@ static pcap_thread_packet_state_t pcap_thread_callback_ipv4_frag(u_char* user, p
         /* All fragments on the list aligns, check if we have the first and last fragment */
         if (frags->fragments && !frags->fragments->offset && f_prev && !f_prev->flag_more_fragments) {
             u_char* p;
+            size_t  len;
+
             /* reassemble all fragments */
             if (!(frags->payload = calloc(1, length))) {
 #ifdef HAVE_PTHREAD
@@ -2412,14 +2414,19 @@ static pcap_thread_packet_state_t pcap_thread_callback_ipv4_frag(u_char* user, p
                 return PCAP_THREAD_PACKET_NOMEM;
             }
             frags->length = length;
-            for (p = frags->payload, f = frags->fragments; f; f = f->next) {
+            for (len = 0, p = frags->payload, f = frags->fragments; f; f = f->next) {
+                if (f != frag) {
+                    len += f->length;
+                }
                 memcpy(p, f->payload, f->length);
                 p = p + f->length;
             }
 
-            frags->packet.name        = packet->name;
-            frags->packet.dlt         = packet->dlt;
-            frags->packet.pkthdr      = packet->pkthdr;
+            frags->packet.name   = packet->name;
+            frags->packet.dlt    = packet->dlt;
+            frags->packet.pkthdr = packet->pkthdr;
+            frags->packet.pkthdr.len += len;
+            frags->packet.pkthdr.caplen += len;
             frags->packet.have_pkthdr = packet->have_pkthdr;
 
             *whole_packet  = &(frags->packet);
@@ -3047,6 +3054,8 @@ static pcap_thread_packet_state_t pcap_thread_callback_ipv6_frag(u_char* user, p
         /* All fragments on the list aligns, check if we have the first and last fragment */
         if (frags->fragments && !frags->fragments->offset && f_prev && !f_prev->flag_more_fragments) {
             u_char* p;
+            size_t  len;
+
             /* reassemble all fragments */
             if (!(frags->payload = calloc(1, length))) {
 #ifdef HAVE_PTHREAD
@@ -3056,14 +3065,19 @@ static pcap_thread_packet_state_t pcap_thread_callback_ipv6_frag(u_char* user, p
                 return PCAP_THREAD_PACKET_NOMEM;
             }
             frags->length = length;
-            for (p = frags->payload, f = frags->fragments; f; f = f->next) {
+            for (len = 0, p = frags->payload, f = frags->fragments; f; f = f->next) {
+                if (f != frag) {
+                    len += f->length;
+                }
                 memcpy(p, f->payload, f->length);
                 p = p + f->length;
             }
 
-            frags->packet.name        = packet->name;
-            frags->packet.dlt         = packet->dlt;
-            frags->packet.pkthdr      = packet->pkthdr;
+            frags->packet.name   = packet->name;
+            frags->packet.dlt    = packet->dlt;
+            frags->packet.pkthdr = packet->pkthdr;
+            frags->packet.pkthdr.len += len;
+            frags->packet.pkthdr.caplen += len;
             frags->packet.have_pkthdr = packet->have_pkthdr;
 
             *whole_packet  = &(frags->packet);
