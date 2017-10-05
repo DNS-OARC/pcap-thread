@@ -32,20 +32,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-workdir="$PWD/bad-packets"
-mkdir -p "$workdir"
+../hexdump -F 4 -F t4 -F p4100 -L udp -v -r ./v4_frag_timeout.pcap-dist >test6.out
+../hexdump -F 6 -F t6 -F p6100 -L udp -v -r ./v6_frag_timeout.pcap-dist >>test6.out
 
-do_test() {
-    files=`ls -1 "$workdir/"*.pcap 2>/dev/null`
-    if [ -z "$files" ]; then
-        echo "No PCAP files generated"
-        exit 1
-    fi
-
-    for file in $files; do
-        ../hexdump -F 4 -F R4 -F p4100 -F 6 -F R6 -F p6100 -L udp -v -r "$file"
-    done
-}
-
-( cd "$srcdir/bad-packets" && make FRAG_PKT_SIZE=@PKT_SIZE@ FRAG_SIZE=@FRAG_SIZE@ NUM_PKTS=20 DESTDIR="$workdir" clean fuzz )
-do_test
+diff test6.out "$srcdir/test6.gold"

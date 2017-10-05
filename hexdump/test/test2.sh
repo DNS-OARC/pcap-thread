@@ -39,7 +39,7 @@ for file in v4_frag_dup.pcap-dist v4_frag_empty.pcap-dist \
     v4_frag_offset_offbyone2.pcap-dist v4_frag_order.pcap-dist \
     v4_frag_skip_first.pcap-dist v4_frag_skip_last.pcap-dist \
     v4_frag_skip_middle.pcap-dist; do
-        ../hexdump -F 4 -F p4100 -L udp -v -r "$file" >>test2.out
+        ../hexdump -F 4 -F R4 -F p4100 -L udp -v -r "$file" >>test2.out
 done
 
 for file in v4_frag_dup.pcap-dist v4_frag_empty.pcap-dist \

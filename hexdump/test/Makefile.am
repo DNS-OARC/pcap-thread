@@ -38,7 +38,8 @@ CLEANFILES = test*.log test*.trs \
     dns.out \
     test2.out \
     test4.out \
-    test5.out
+    test5.out \
+    test6.out
 
 TESTS = test1.sh test2.sh \
     test3_120_1120.sh test3_120_1240.sh test3_120_1400.sh test3_120_1800.sh \
@@ -49,7 +50,8 @@ TESTS = test1.sh test2.sh \
     test3_890_1120.sh test3_890_1240.sh test3_890_1400.sh test3_890_1800.sh \
     test3_890_900.sh \
     test4.sh \
-    test5.sh
+    test5.sh \
+    test6.sh
 
 test1.sh: dns.pcap-dist
 
@@ -67,6 +69,8 @@ test4.sh: v6_frag_dup.pcap-dist v6_frag_empty.pcap-dist \
 
 test5.sh: icmp_fuzz.pcap-dist icmpv6_fuzz.pcap-dist
 
+test6.sh: v4_frag_timeout.pcap-dist v6_frag_timeout.pcap-dist
+
 .pcap.pcap-dist:
 	cp "$<" "$@"
 
@@ -82,4 +86,5 @@ EXTRA_DIST = $(TESTS) \
     v6_frag_order.pcap v6_frag_skip_first.pcap v6_frag_skip_last.pcap \
     v6_frag_skip_middle.pcap \
     test4.gold \
-    icmp_fuzz.pcap icmpv6_fuzz.pcap test5.gold
+    icmp_fuzz.pcap icmpv6_fuzz.pcap test5.gold \
+    v4_frag_timeout.pcap v6_frag_timeout.pcap test6.gold
