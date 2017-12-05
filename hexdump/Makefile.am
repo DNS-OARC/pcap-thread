@@ -34,7 +34,8 @@
 ACLOCAL_AMFLAGS = -I ../m4
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in $(srcdir)/config.h.in
-CLEANFILES = pcap_thread.c pcap_thread.h
+CLEANFILES = pcap_thread.c pcap_thread.h \
+    pcap_thread_ext_frag.c pcap_thread_ext_frag.h
 
 SUBDIRS = test
 
@@ -42,7 +43,7 @@ AM_CFLAGS = -Wall -I$(srcdir) -I$(top_srcdir)/../ $(PTHREAD_CFLAGS)
 
 bin_PROGRAMS    = hexdump
 
-hexdump_SOURCES = hexdump.c pcap_thread.c
+hexdump_SOURCES = hexdump.c pcap_thread.c pcap_thread_ext_frag.c
 hexdump_LDADD   = $(PTHREAD_LIBS)
 
 pcap_thread.c: $(top_srcdir)/../pcap_thread.c pcap_thread.h
@@ -50,5 +51,11 @@ pcap_thread.c: $(top_srcdir)/../pcap_thread.c pcap_thread.h
 
 pcap_thread.h: $(top_srcdir)/../pcap_thread.h
 	cp "$(top_srcdir)/../pcap_thread.h" .
+
+pcap_thread_ext_frag.c: $(top_srcdir)/../pcap_thread_ext_frag.c pcap_thread_ext_frag.h
+	cp "$(top_srcdir)/../pcap_thread_ext_frag.c" .
+
+pcap_thread_ext_frag.h: $(top_srcdir)/../pcap_thread_ext_frag.h pcap_thread.h
+	cp "$(top_srcdir)/../pcap_thread_ext_frag.h" .
 
 test: check

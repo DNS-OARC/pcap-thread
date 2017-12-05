@@ -35,6 +35,7 @@
 
 #include "config.h"
 #include "pcap_thread.h"
+#include "pcap_thread_ext_frag.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -146,20 +147,17 @@ void invalid(u_char* user, const pcap_thread_packet_t* packet, const u_char* pay
     case PCAP_THREAD_PACKET_INVALID_TCP:
         state = user ? "invalid tcp" : "-";
         break;
-    case PCAP_THREAD_PACKET_TOO_MANY_FRAGMENTS:
-        state = user ? "too many fragments" : "#";
+    case PCAP_THREAD_PACKET_IS_FRAGMENT:
+        state = user ? "is fragment" : "#";
         break;
-    case PCAP_THREAD_PACKET_INVALID_FRAGMENTS:
-        state = user ? "invalid fragments" : "#";
+    case PCAP_THREAD_PACKET_INVALID_FRAGMENT:
+        state = user ? "invalid fragment(s)" : "#";
         break;
-    case PCAP_THREAD_PACKET_NOMEM:
+    case PCAP_THREAD_PACKET_ENOMEM:
         state = user ? "nomem" : "!";
         break;
     case PCAP_THREAD_PACKET_EMUTEX:
         state = user ? "mutex" : "!";
-        break;
-    case PCAP_THREAD_PACKET_IS_FRAGMENT:
-        state = user ? "is fragment" : "#";
         break;
     default:
         state = user ? "UNKNOWN" : "???";
@@ -238,6 +236,55 @@ void stat_callback(u_char* user, const struct pcap_stat* stats, const char* name
     }
 }
 
+void ext_frag_callback(const pcap_thread_packet_t* packet, const u_char* payload, size_t length, const pcap_thread_ext_frag_fragments_t* fragments)
+{
+    pcap_thread_ext_frag_fragment_t* f;
+    size_t                           n;
+
+    if (packet->have_iphdr) {
+        printf("!#(%d) name:%s ts:%ld.%ld datalink:%s offset:%d len:%lu mf:%s data:",
+            PCAP_THREAD_PACKET_INVALID_FRAGMENT,
+            packet->name,
+            (long)packet->pkthdr.ts.tv_sec, packet->pkthdr.ts.tv_usec,
+            pcap_datalink_val_to_name(packet->dlt),
+            (packet->iphdr.ip_off & 0x1fff) * 8,
+            length,
+            packet->iphdr.ip_off & 0x2000 ? "yes" : "no");
+        for (n = 0; n < length; n++) {
+            printf("%02x", payload[n]);
+        }
+        printf("\n");
+    } else if (packet->have_ip6frag) {
+        printf("!#(%d) name:%s ts:%ld.%ld datalink:%s offset:%d len:%lu mf:%s data:",
+            PCAP_THREAD_PACKET_INVALID_FRAGMENT,
+            packet->name,
+            (long)packet->pkthdr.ts.tv_sec, packet->pkthdr.ts.tv_usec,
+            pcap_datalink_val_to_name(packet->dlt),
+            ((packet->ip6frag.ip6f_offlg & 0xfff8) >> 3) * 8,
+            length,
+            packet->ip6frag.ip6f_offlg & 0x1 ? "yes" : "no");
+        for (n = 0; n < length; n++) {
+            printf("%02x", payload[n]);
+        }
+        printf("\n");
+    }
+
+    for (f = fragments->fragments; f; f = f->next) {
+        printf("#(%d) name:%s ts:%ld.%ld datalink:%s offset:%lu len:%lu mf:%s data:",
+            PCAP_THREAD_PACKET_IS_FRAGMENT,
+            packet->name,
+            (long)packet->pkthdr.ts.tv_sec, packet->pkthdr.ts.tv_usec,
+            pcap_datalink_val_to_name(packet->dlt),
+            f->offset,
+            f->length,
+            f->flag_more_fragments ? "yes" : "no");
+        for (n = 0; n < f->length; n++) {
+            printf("%02x", f->payload[n]);
+        }
+        printf("\n");
+    }
+}
+
 pcap_thread_t          pt                  = PCAP_THREAD_T_INIT;
 pcap_thread_pcaplist_t __pcaplist_not_used = PCAP_THREAD_PCAPLIST_T_INIT;
 
@@ -263,7 +310,7 @@ int do_next(int cnt)
 
 int main(int argc, char** argv)
 {
-    int              opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0, cnt = 0, layers = 0;
+    int              opt, err = 0, ret = 0, interface = 0, verbose = 0, i, stats = 0, cnt = 0, layers = 0, defrag_ipv4 = 0, defrag_ipv6 = 0;
     char*            interfaces[MAX_INTERFACES];
     char             is_file[MAX_INTERFACES];
     char             filter[MAX_FILTER_SIZE];
@@ -271,6 +318,9 @@ int main(int argc, char** argv)
     size_t           filter_left = MAX_FILTER_SIZE;
     struct sigaction sa;
     time_t           exit_after_time = 0;
+
+    pcap_thread_ext_frag_conf_t ipv4_frag_conf = PCAP_THREAD_EXT_FRAG_CONF_T_INIT;
+    pcap_thread_ext_frag_conf_t ipv6_frag_conf = PCAP_THREAD_EXT_FRAG_CONF_T_INIT;
 
     memset(is_file, 0, MAX_INTERFACES);
     memset(&sa, 0, sizeof(struct sigaction));
@@ -456,8 +506,12 @@ int main(int argc, char** argv)
                 " -L <layer>         capture at layer: ether, null, loop, ieee802, gre, ip,\n"
                 "                                      ipv4, ipv6, icmp, icmpv6, udp or tcp\n"
                 " -F <ip proto>      defragment packets for IP protocol: 4, 6\n"
-                " -F m<ip p><num>    set maximum fragments per IP protocol: 4, 6\n"
-                " -F p<ip p><num>    set maximum packet fragments per IP protocol: 4, 6\n"
+                " -F m<ip prot><num> set maximum number of fragments\n"
+                " -F p<ip prot><num> set maximum number of fragments per packet\n"
+                " -F R<ip proto>     set rejection of overlapping fragments\n"
+                " -F t<ip prot>[sec] enable checking of timed out fragments and optionally\n"
+                "                    set the timeout in seconds\n"
+                " -F d<ip pro><what> enable reporting of: overlap, timeout\n"
                 " -D                 display stats on exit\n"
                 " -V                 display version and exit\n"
                 " -h                 this\n");
@@ -511,24 +565,63 @@ int main(int argc, char** argv)
             break;
         case 'F':
             if (!strcmp("4", optarg))
-                ret = pcap_thread_set_defrag_ipv4(&pt, 1);
+                defrag_ipv4 = 1;
             else if (!strcmp("6", optarg))
-                ret = pcap_thread_set_defrag_ipv6(&pt, 1);
+                defrag_ipv6 = 1;
             else if (strlen(optarg) > 2 && optarg[0] == 'm') {
                 int max = atoi(&optarg[2]);
                 if (max > 0 && optarg[1] == '4')
-                    pcap_thread_set_max_ipv4_fragments(&pt, max);
+                    ret = pcap_thread_ext_frag_conf_set_fragments(&ipv4_frag_conf, max);
                 else if (max > 0 && optarg[1] == '6')
-                    pcap_thread_set_max_ipv6_fragments(&pt, max);
+                    ret = pcap_thread_ext_frag_conf_set_fragments(&ipv6_frag_conf, max);
                 else
                     err = -1;
             } else if (strlen(optarg) > 2 && optarg[0] == 'p') {
                 int max = atoi(&optarg[2]);
                 if (max > 0 && optarg[1] == '4')
-                    pcap_thread_set_max_ipv4_fragments_per_packet(&pt, max);
+                    ret = pcap_thread_ext_frag_conf_set_per_packet(&ipv4_frag_conf, max);
                 else if (max > 0 && optarg[1] == '6')
-                    pcap_thread_set_max_ipv6_fragments_per_packet(&pt, max);
+                    ret = pcap_thread_ext_frag_conf_set_per_packet(&ipv6_frag_conf, max);
                 else
+                    err = -1;
+            } else if (!strcmp("R4", optarg)) {
+                ret = pcap_thread_ext_frag_conf_set_reject_overlap(&ipv4_frag_conf, 1);
+            } else if (!strcmp("R6", optarg)) {
+                ret = pcap_thread_ext_frag_conf_set_reject_overlap(&ipv6_frag_conf, 1);
+            } else if (!strcmp("t4", optarg)) {
+                ret = pcap_thread_ext_frag_conf_set_check_timeout(&ipv4_frag_conf, 1);
+            } else if (!strcmp("t6", optarg)) {
+                ret = pcap_thread_ext_frag_conf_set_check_timeout(&ipv6_frag_conf, 1);
+            } else if (strlen(optarg) > 2 && optarg[0] == 't') {
+                int            max = atoi(&optarg[2]);
+                struct timeval ts  = { 0, 0 };
+                ts.tv_sec          = max;
+                if (max > 0 && optarg[1] == '4') {
+                    ret = pcap_thread_ext_frag_conf_set_timeout(&ipv4_frag_conf, ts);
+                    if (!ret)
+                        ret = pcap_thread_ext_frag_conf_set_check_timeout(&ipv4_frag_conf, 1);
+                } else if (max > 0 && optarg[1] == '6') {
+                    ret = pcap_thread_ext_frag_conf_set_timeout(&ipv6_frag_conf, ts);
+                    if (!ret)
+                        ret = pcap_thread_ext_frag_conf_set_check_timeout(&ipv6_frag_conf, 1);
+                } else
+                    err = -1;
+            } else if (strlen(optarg) > 2 && optarg[0] == 'd') {
+                if (optarg[1] == '4') {
+                    if (!strcmp("overlap", &optarg[2]))
+                        ret = pcap_thread_ext_frag_conf_set_overlap_callback(&ipv4_frag_conf, ext_frag_callback);
+                    else if (!strcmp("timeout", &optarg[2]))
+                        ret = pcap_thread_ext_frag_conf_set_timeout_callback(&ipv4_frag_conf, ext_frag_callback);
+                    else
+                        ret = -1;
+                } else if (optarg[1] == '6') {
+                    if (!strcmp("overlap", &optarg[2]))
+                        ret = pcap_thread_ext_frag_conf_set_overlap_callback(&ipv6_frag_conf, ext_frag_callback);
+                    else if (!strcmp("timeout", &optarg[2]))
+                        ret = pcap_thread_ext_frag_conf_set_timeout_callback(&ipv6_frag_conf, ext_frag_callback);
+                    else
+                        ret = -1;
+                } else
                     err = -1;
             } else
                 err = -1;
@@ -622,12 +715,16 @@ int main(int argc, char** argv)
         printf("filter_optimize: %s\n", pcap_thread_filter_optimze(&pt) ? "yes" : "no");
         printf("filter_netmask: 0x%x\n", pcap_thread_filter_netmask(&pt));
         printf("filter: %s\n", filter);
-        printf("defrag_ipv4: %s\n", pcap_thread_defrag_ipv4(&pt) ? "yes" : "no");
-        printf("defrag_ipv6: %s\n", pcap_thread_defrag_ipv6(&pt) ? "yes" : "no");
-        printf("max_ipv4_fragments: %lu\n", pcap_thread_max_ipv4_fragments(&pt));
-        printf("max_ipv4_fragments_per_packet: %lu\n", pcap_thread_max_ipv4_fragments_per_packet(&pt));
-        printf("max_ipv6_fragments: %lu\n", pcap_thread_max_ipv6_fragments(&pt));
-        printf("max_ipv6_fragments_per_packet: %lu\n", pcap_thread_max_ipv6_fragments_per_packet(&pt));
+        printf("defrag_ipv4: %s\n", defrag_ipv4 ? "yes" : "no");
+        printf("defrag_ipv6: %s\n", defrag_ipv6 ? "yes" : "no");
+        printf("max_ipv4_fragments: %lu\n", pcap_thread_ext_frag_conf_fragments(&ipv4_frag_conf));
+        printf("max_ipv4_fragments_per_packet: %lu\n", pcap_thread_ext_frag_conf_per_packet(&ipv4_frag_conf));
+        printf("max_ipv6_fragments: %lu\n", pcap_thread_ext_frag_conf_fragments(&ipv6_frag_conf));
+        printf("max_ipv6_fragments_per_packet: %lu\n", pcap_thread_ext_frag_conf_per_packet(&ipv6_frag_conf));
+        printf("check_frag_timeout_ipv4: %s\n", pcap_thread_ext_frag_conf_check_timeout(&ipv4_frag_conf) ? "yes" : "no");
+        printf("check_frag_timeout_ipv6: %s\n", pcap_thread_ext_frag_conf_check_timeout(&ipv6_frag_conf) ? "yes" : "no");
+        printf("frag_timeout_ipv4: %ld\n", (long)(pcap_thread_ext_frag_conf_timeout(&ipv4_frag_conf).tv_sec));
+        printf("frag_timeout_ipv6: %ld\n", (long)(pcap_thread_ext_frag_conf_timeout(&ipv6_frag_conf).tv_sec));
     }
 
     if (exit_after_time) {
@@ -645,6 +742,10 @@ int main(int argc, char** argv)
         fprintf(stderr, "set dropback ");
     else if (layers && (ret = pcap_thread_set_callback_invalid(&pt, invalid)))
         fprintf(stderr, "set invalid callback ");
+    else if (layers && defrag_ipv4 && (ret = pcap_thread_set_callback_ipv4_frag(&pt, pcap_thread_ext_frag_layer_callback(&ipv4_frag_conf))))
+        fprintf(stderr, "set callback ipv4 frag ");
+    else if (layers && defrag_ipv6 && (ret = pcap_thread_set_callback_ipv6_frag(&pt, pcap_thread_ext_frag_layer_callback(&ipv6_frag_conf))))
+        fprintf(stderr, "set callback ipv6 frag ");
     else {
         for (i = 0; i < interface; i++) {
             if (is_file[i]) {
