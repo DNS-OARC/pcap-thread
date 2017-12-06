@@ -812,6 +812,7 @@ static pcap_thread_packet_state_t reassemble_ipv6(_ctx_t* ctx, const pcap_thread
     return reassemble(ctx, packet, whole_packet, whole_payload, whole_length, frags, frag);
 }
 
+#ifdef HAVE_PTHREAD /* _release() is only used when mutex functions fails */
 static void _release(_ctx_t* ctx, const pcap_thread_packet_t* packet)
 {
     pcap_thread_ext_frag_fragments_t *frags, *frags_prev;
@@ -867,6 +868,7 @@ static void _release(_ctx_t* ctx, const pcap_thread_packet_t* packet)
         free(frags);
     }
 }
+#endif
 
 static pcap_thread_packet_state_t pcap_thread_layer_callback_frag_reassemble(void* _ctx, const pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length)
 {
