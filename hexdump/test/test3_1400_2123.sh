@@ -47,5 +47,5 @@ do_test() {
     done
 }
 
-( cd "$srcdir/bad-packets" && make FRAG_PKT_SIZE=2123 FRAG_SIZE=1400 NUM_PKTS=20 DESTDIR="$workdir" clean fuzz )
+( cd "$srcdir/bad-packets" && make FRAG_PKT_SIZE=2123 FRAG_SIZE=1400 NUM_PKTS=5 DESTDIR="$workdir" clean fuzz )
 do_test

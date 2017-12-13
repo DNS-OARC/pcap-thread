@@ -34,20 +34,36 @@
 
 rm -f test4.out
 
-for file in v6_frag_dup.pcap-dist v6_frag_empty.pcap-dist \
-    v6_frag_nomf.pcap-dist v6_frag_offset_offbyone1.pcap-dist \
-    v6_frag_offset_offbyone2.pcap-dist v6_frag_order.pcap-dist \
-    v6_frag_skip_first.pcap-dist v6_frag_skip_last.pcap-dist \
-    v6_frag_skip_middle.pcap-dist; do
+for file in v6_frag_dup_udp.pcap-dist v6_frag_empty_udp.pcap-dist \
+    v6_frag_nomf_udp.pcap-dist v6_frag_offset_offbyone1_udp.pcap-dist \
+    v6_frag_offset_offbyone2_udp.pcap-dist v6_frag_order_udp.pcap-dist \
+    v6_frag_skip_first_udp.pcap-dist v6_frag_skip_last_udp.pcap-dist \
+    v6_frag_skip_middle_udp.pcap-dist; do
         ../hexdump -F 6 -F R6 -F p6100 -L udp -v -r "$file" >>test4.out
 done
 
-for file in v6_frag_dup.pcap-dist v6_frag_empty.pcap-dist \
-    v6_frag_nomf.pcap-dist v6_frag_offset_offbyone1.pcap-dist \
-    v6_frag_offset_offbyone2.pcap-dist v6_frag_order.pcap-dist \
-    v6_frag_skip_first.pcap-dist v6_frag_skip_last.pcap-dist \
-    v6_frag_skip_middle.pcap-dist; do
+for file in v6_frag_dup_udp.pcap-dist v6_frag_empty_udp.pcap-dist \
+    v6_frag_nomf_udp.pcap-dist v6_frag_offset_offbyone1_udp.pcap-dist \
+    v6_frag_offset_offbyone2_udp.pcap-dist v6_frag_order_udp.pcap-dist \
+    v6_frag_skip_first_udp.pcap-dist v6_frag_skip_last_udp.pcap-dist \
+    v6_frag_skip_middle_udp.pcap-dist; do
         ../hexdump -L udp -v -r "$file" >>test4.out
+done
+
+for file in v6_frag_dup_tcp.pcap-dist v6_frag_empty_tcp.pcap-dist \
+    v6_frag_nomf_tcp.pcap-dist v6_frag_offset_offbyone1_tcp.pcap-dist \
+    v6_frag_offset_offbyone2_tcp.pcap-dist v6_frag_order_tcp.pcap-dist \
+    v6_frag_skip_first_tcp.pcap-dist v6_frag_skip_last_tcp.pcap-dist \
+    v6_frag_skip_middle_tcp.pcap-dist; do
+        ../hexdump -F 6 -F R6 -F p6100 -L tcp -v -r "$file" >>test4.out
+done
+
+for file in v6_frag_dup_tcp.pcap-dist v6_frag_empty_tcp.pcap-dist \
+    v6_frag_nomf_tcp.pcap-dist v6_frag_offset_offbyone1_tcp.pcap-dist \
+    v6_frag_offset_offbyone2_tcp.pcap-dist v6_frag_order_tcp.pcap-dist \
+    v6_frag_skip_first_tcp.pcap-dist v6_frag_skip_last_tcp.pcap-dist \
+    v6_frag_skip_middle_tcp.pcap-dist; do
+        ../hexdump -L tcp -v -r "$file" >>test4.out
 done
 
 diff test4.out "$srcdir/test4.gold"

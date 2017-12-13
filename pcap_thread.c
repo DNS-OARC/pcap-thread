@@ -1892,7 +1892,18 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
 
                     switch (packet->iphdr.ip_p) {
                     case IPPROTO_GRE:
-                        layer_trace("ipproto_gre");
+                        layer_trace("ipproto_gre frag");
+
+                        if (!(packet->iphdr.ip_off & 0x1fff)) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_GREHDR;
+                                need16(packet->grehdr.gre_flags, payload, length);
+                                need16(packet->grehdr.ether_type, payload, length);
+                                packet->state       = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_grehdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_gre) {
                             pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
@@ -1901,7 +1912,19 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                         break;
 
                     case IPPROTO_ICMP:
-                        layer_trace("ipproto_icmp");
+                        layer_trace("ipproto_icmp frag");
+
+                        if (!(packet->iphdr.ip_off & 0x1fff)) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_ICMPHDR;
+                                need8(packet->icmphdr.type, payload, length);
+                                need8(packet->icmphdr.code, payload, length);
+                                need16(packet->icmphdr.checksum, payload, length);
+                                packet->state        = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_icmphdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_icmp) {
                             pcaplist->pcap_thread->callback_icmp(pcaplist->user, packet, payload, length);
@@ -1910,7 +1933,20 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                         break;
 
                     case IPPROTO_UDP:
-                        layer_trace("ipproto_udp");
+                        layer_trace("ipproto_udp frag");
+
+                        if (!(packet->iphdr.ip_off & 0x1fff)) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_UDPHDR;
+                                need16(packet->udphdr.uh_sport, payload, length);
+                                need16(packet->udphdr.uh_dport, payload, length);
+                                need16(packet->udphdr.uh_ulen, payload, length);
+                                need16(packet->udphdr.uh_sum, payload, length);
+                                packet->state       = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_udphdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_udp) {
                             pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
@@ -1919,7 +1955,30 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                         break;
 
                     case IPPROTO_TCP:
-                        layer_trace("ipproto_tcp");
+                        layer_trace("ipproto_tcp frag");
+
+                        if (!(packet->iphdr.ip_off & 0x1fff)) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_TCPHDR;
+                                need16(packet->tcphdr.th_sport, payload, length);
+                                need16(packet->tcphdr.th_dport, payload, length);
+                                need32(packet->tcphdr.th_seq, payload, length);
+                                need32(packet->tcphdr.th_ack, payload, length);
+                                need4x2(packet->tcphdr.th_off, packet->tcphdr.th_x2, payload, length);
+                                need8(packet->tcphdr.th_flags, payload, length);
+                                need16(packet->tcphdr.th_win, payload, length);
+                                need16(packet->tcphdr.th_sum, payload, length);
+                                need16(packet->tcphdr.th_urp, payload, length);
+                                if (packet->tcphdr.th_off > 5) {
+                                    packet->tcpopts_len = (packet->tcphdr.th_off - 5) * 4;
+                                    needxb(&(packet->tcpopts[0]), packet->tcpopts_len, payload, length);
+                                    packet->have_tcpopts = 1;
+                                }
+                                packet->state       = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_tcphdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_tcp) {
                             pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
@@ -2020,6 +2079,11 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
                 need16(packet->tcphdr.th_win, payload, length);
                 need16(packet->tcphdr.th_sum, payload, length);
                 need16(packet->tcphdr.th_urp, payload, length);
+                if (packet->tcphdr.th_off > 5) {
+                    packet->tcpopts_len = (packet->tcphdr.th_off - 5) * 4;
+                    needxb(&(packet->tcpopts[0]), packet->tcpopts_len, payload, length);
+                    packet->have_tcpopts = 1;
+                }
                 packet->state       = PCAP_THREAD_PACKET_OK;
                 packet->have_tcphdr = 1;
 
@@ -2207,7 +2271,18 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
 
                     switch (ext.ip6e_nxt) {
                     case IPPROTO_GRE:
-                        layer_trace("ipproto_gre");
+                        layer_trace("ipproto_gre frag");
+
+                        if (!packet->ip6frag.ip6f_offlg) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_GREHDR;
+                                need16(packet->grehdr.gre_flags, payload, length);
+                                need16(packet->grehdr.ether_type, payload, length);
+                                packet->state       = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_grehdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_gre) {
                             pcaplist->pcap_thread->callback_gre(pcaplist->user, packet, payload, length);
@@ -2216,7 +2291,19 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
                         break;
 
                     case IPPROTO_ICMPV6:
-                        layer_trace("ipproto_icmpv6");
+                        layer_trace("ipproto_icmpv6 frag");
+
+                        if (!packet->ip6frag.ip6f_offlg) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_ICMPV6HDR;
+                                need8(packet->icmpv6hdr.icmp6_type, payload, length);
+                                need8(packet->icmpv6hdr.icmp6_code, payload, length);
+                                need16(packet->icmpv6hdr.icmp6_cksum, payload, length);
+                                packet->state          = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_icmpv6hdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_icmpv6) {
                             pcaplist->pcap_thread->callback_icmpv6(pcaplist->user, packet, payload, length);
@@ -2225,7 +2312,20 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
                         break;
 
                     case IPPROTO_UDP:
-                        layer_trace("ipproto_udp");
+                        layer_trace("ipproto_udp frag");
+
+                        if (!packet->ip6frag.ip6f_offlg) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_UDPHDR;
+                                need16(packet->udphdr.uh_sport, payload, length);
+                                need16(packet->udphdr.uh_dport, payload, length);
+                                need16(packet->udphdr.uh_ulen, payload, length);
+                                need16(packet->udphdr.uh_sum, payload, length);
+                                packet->state       = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_udphdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_udp) {
                             pcaplist->pcap_thread->callback_udp(pcaplist->user, packet, payload, length);
@@ -2234,7 +2334,30 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
                         break;
 
                     case IPPROTO_TCP:
-                        layer_trace("ipproto_tcp");
+                        layer_trace("ipproto_tcp frag");
+
+                        if (!packet->ip6frag.ip6f_offlg) {
+                            for (;;) {
+                                packet->state = PCAP_THREAD_PACKET_FRAGMENTED_TCPHDR;
+                                need16(packet->tcphdr.th_sport, payload, length);
+                                need16(packet->tcphdr.th_dport, payload, length);
+                                need32(packet->tcphdr.th_seq, payload, length);
+                                need32(packet->tcphdr.th_ack, payload, length);
+                                need4x2(packet->tcphdr.th_off, packet->tcphdr.th_x2, payload, length);
+                                need8(packet->tcphdr.th_flags, payload, length);
+                                need16(packet->tcphdr.th_win, payload, length);
+                                need16(packet->tcphdr.th_sum, payload, length);
+                                need16(packet->tcphdr.th_urp, payload, length);
+                                if (packet->tcphdr.th_off > 5) {
+                                    packet->tcpopts_len = (packet->tcphdr.th_off - 5) * 4;
+                                    needxb(&(packet->tcpopts[0]), packet->tcpopts_len, payload, length);
+                                    packet->have_tcpopts = 1;
+                                }
+                                packet->state       = PCAP_THREAD_PACKET_IS_FRAGMENT;
+                                packet->have_tcphdr = 1;
+                                break;
+                            }
+                        }
 
                         if (pcaplist->pcap_thread->callback_tcp) {
                             pcaplist->pcap_thread->callback_tcp(pcaplist->user, packet, payload, length);
@@ -2329,6 +2452,11 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
                 need16(packet->tcphdr.th_win, payload, length);
                 need16(packet->tcphdr.th_sum, payload, length);
                 need16(packet->tcphdr.th_urp, payload, length);
+                if (packet->tcphdr.th_off > 5) {
+                    packet->tcpopts_len = (packet->tcphdr.th_off - 5) * 4;
+                    needxb(&(packet->tcpopts[0]), packet->tcpopts_len, payload, length);
+                    packet->have_tcpopts = 1;
+                }
                 packet->state       = PCAP_THREAD_PACKET_OK;
                 packet->have_tcphdr = 1;
 

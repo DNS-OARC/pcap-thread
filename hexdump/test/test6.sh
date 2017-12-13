@@ -32,7 +32,9 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-../hexdump -F 4 -F t4 -F p4100 -L udp -v -r ./v4_frag_timeout.pcap-dist >test6.out
-../hexdump -F 6 -F t6 -F p6100 -L udp -v -r ./v6_frag_timeout.pcap-dist >>test6.out
+../hexdump -F 4 -F t4 -F p4100 -L udp -v -r ./v4_frag_timeout_udp.pcap-dist >test6.out
+../hexdump -F 6 -F t6 -F p6100 -L udp -v -r ./v6_frag_timeout_udp.pcap-dist >>test6.out
+../hexdump -F 4 -F t4 -F p4100 -L tcp -v -r ./v4_frag_timeout_tcp.pcap-dist >>test6.out
+../hexdump -F 6 -F t6 -F p6100 -L tcp -v -r ./v6_frag_timeout_tcp.pcap-dist >>test6.out
 
 diff test6.out "$srcdir/test6.gold"
