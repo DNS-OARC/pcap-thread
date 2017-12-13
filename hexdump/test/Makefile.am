@@ -55,36 +55,56 @@ TESTS = test1.sh test2.sh \
 
 test1.sh: dns.pcap-dist
 
-test2.sh: v4_frag_dup.pcap-dist v4_frag_empty.pcap-dist \
-    v4_frag_nomf.pcap-dist v4_frag_offset_offbyone1.pcap-dist \
-    v4_frag_offset_offbyone2.pcap-dist v4_frag_order.pcap-dist \
-    v4_frag_skip_first.pcap-dist v4_frag_skip_last.pcap-dist \
-    v4_frag_skip_middle.pcap-dist
+test2.sh: v4_frag_dup_udp.pcap-dist v4_frag_empty_udp.pcap-dist \
+    v4_frag_nomf_udp.pcap-dist v4_frag_offset_offbyone1_udp.pcap-dist \
+    v4_frag_offset_offbyone2_udp.pcap-dist v4_frag_order_udp.pcap-dist \
+    v4_frag_skip_first_udp.pcap-dist v4_frag_skip_last_udp.pcap-dist \
+    v4_frag_skip_middle_udp.pcap-dist \
+    v4_frag_dup_tcp.pcap-dist v4_frag_empty_tcp.pcap-dist \
+    v4_frag_nomf_tcp.pcap-dist v4_frag_offset_offbyone1_tcp.pcap-dist \
+    v4_frag_offset_offbyone2_tcp.pcap-dist v4_frag_order_tcp.pcap-dist \
+    v4_frag_skip_first_tcp.pcap-dist v4_frag_skip_last_tcp.pcap-dist \
+    v4_frag_skip_middle_tcp.pcap-dist
 
-test4.sh: v6_frag_dup.pcap-dist v6_frag_empty.pcap-dist \
-    v6_frag_nomf.pcap-dist v6_frag_offset_offbyone1.pcap-dist \
-    v6_frag_offset_offbyone2.pcap-dist v6_frag_order.pcap-dist \
-    v6_frag_skip_first.pcap-dist v6_frag_skip_last.pcap-dist \
-    v6_frag_skip_middle.pcap-dist
+test4.sh: v6_frag_dup_udp.pcap-dist v6_frag_empty_udp.pcap-dist \
+    v6_frag_nomf_udp.pcap-dist v6_frag_offset_offbyone1_udp.pcap-dist \
+    v6_frag_offset_offbyone2_udp.pcap-dist v6_frag_order_udp.pcap-dist \
+    v6_frag_skip_first_udp.pcap-dist v6_frag_skip_last_udp.pcap-dist \
+    v6_frag_skip_middle_udp.pcap-dist \
+    v6_frag_dup_tcp.pcap-dist v6_frag_empty_tcp.pcap-dist \
+    v6_frag_nomf_tcp.pcap-dist v6_frag_offset_offbyone1_tcp.pcap-dist \
+    v6_frag_offset_offbyone2_tcp.pcap-dist v6_frag_order_tcp.pcap-dist \
+    v6_frag_skip_first_tcp.pcap-dist v6_frag_skip_last_tcp.pcap-dist \
+    v6_frag_skip_middle_tcp.pcap-dist
 
 test5.sh: icmp_fuzz.pcap-dist icmpv6_fuzz.pcap-dist
 
-test6.sh: v4_frag_timeout.pcap-dist v6_frag_timeout.pcap-dist
+test6.sh: v4_frag_timeout_udp.pcap-dist v6_frag_timeout_udp.pcap-dist \
+    v4_frag_timeout_tcp.pcap-dist v6_frag_timeout_tcp.pcap-dist
 
 .pcap.pcap-dist:
 	cp "$<" "$@"
 
 EXTRA_DIST = $(TESTS) \
     dns.gold dns.pcap \
-    v4_frag_dup.pcap v4_frag_empty.pcap v4_frag_nomf.pcap \
-    v4_frag_offset_offbyone1.pcap v4_frag_offset_offbyone2.pcap \
-    v4_frag_order.pcap v4_frag_skip_first.pcap v4_frag_skip_last.pcap \
-    v4_frag_skip_middle.pcap \
+    v4_frag_dup_udp.pcap v4_frag_empty_udp.pcap v4_frag_nomf_udp.pcap \
+    v4_frag_offset_offbyone1_udp.pcap v4_frag_offset_offbyone2_udp.pcap \
+    v4_frag_order_udp.pcap v4_frag_skip_first_udp.pcap v4_frag_skip_last_udp.pcap \
+    v4_frag_skip_middle_udp.pcap \
+    v4_frag_dup_tcp.pcap v4_frag_empty_tcp.pcap v4_frag_nomf_tcp.pcap \
+    v4_frag_offset_offbyone1_tcp.pcap v4_frag_offset_offbyone2_tcp.pcap \
+    v4_frag_order_tcp.pcap v4_frag_skip_first_tcp.pcap v4_frag_skip_last_tcp.pcap \
+    v4_frag_skip_middle_tcp.pcap \
     test2.gold \
-    v6_frag_dup.pcap v6_frag_empty.pcap v6_frag_nomf.pcap \
-    v6_frag_offset_offbyone1.pcap v6_frag_offset_offbyone2.pcap \
-    v6_frag_order.pcap v6_frag_skip_first.pcap v6_frag_skip_last.pcap \
-    v6_frag_skip_middle.pcap \
+    v6_frag_dup_udp.pcap v6_frag_empty_udp.pcap v6_frag_nomf_udp.pcap \
+    v6_frag_offset_offbyone1_udp.pcap v6_frag_offset_offbyone2_udp.pcap \
+    v6_frag_order_udp.pcap v6_frag_skip_first_udp.pcap v6_frag_skip_last_udp.pcap \
+    v6_frag_skip_middle_udp.pcap \
+    v6_frag_dup_tcp.pcap v6_frag_empty_tcp.pcap v6_frag_nomf_tcp.pcap \
+    v6_frag_offset_offbyone1_tcp.pcap v6_frag_offset_offbyone2_tcp.pcap \
+    v6_frag_order_tcp.pcap v6_frag_skip_first_tcp.pcap v6_frag_skip_last_tcp.pcap \
+    v6_frag_skip_middle_tcp.pcap \
     test4.gold \
     icmp_fuzz.pcap icmpv6_fuzz.pcap test5.gold \
-    v4_frag_timeout.pcap v6_frag_timeout.pcap test6.gold
+    v4_frag_timeout_udp.pcap v6_frag_timeout_udp.pcap test6.gold \
+    v4_frag_timeout_tcp.pcap v6_frag_timeout_tcp.pcap test6.gold

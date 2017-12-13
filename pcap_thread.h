@@ -200,7 +200,12 @@ enum pcap_thread_packet_state {
     PCAP_THREAD_PACKET_IS_FRAGMENT,
     PCAP_THREAD_PACKET_INVALID_FRAGMENT,
     PCAP_THREAD_PACKET_ENOMEM,
-    PCAP_THREAD_PACKET_EMUTEX
+    PCAP_THREAD_PACKET_EMUTEX,
+    PCAP_THREAD_PACKET_FRAGMENTED_GREHDR,
+    PCAP_THREAD_PACKET_FRAGMENTED_ICMPHDR,
+    PCAP_THREAD_PACKET_FRAGMENTED_ICMPV6HDR,
+    PCAP_THREAD_PACKET_FRAGMENTED_UDPHDR,
+    PCAP_THREAD_PACKET_FRAGMENTED_TCPHDR
 };
 
 typedef struct pcap_thread_packet pcap_thread_packet_t;
@@ -222,6 +227,7 @@ struct pcap_thread_packet {
     unsigned short have_icmpv6hdr : 1;
     unsigned short have_udphdr : 1;
     unsigned short have_tcphdr : 1;
+    unsigned short have_tcpopts : 1;
 
     const char*                    name;
     int                            dlt;
@@ -317,6 +323,8 @@ struct pcap_thread_packet {
             };
         };
     } tcphdr;
+    u_int8_t tcpopts[64];
+    size_t   tcpopts_len;
 
     pcap_thread_packet_state_t state;
 };
