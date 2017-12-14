@@ -1,3 +1,111 @@
+2017-12-14 Jerry Lundström
+
+    Release pcap-thread 3.0.0, hexdump 2.0.0
+
+    Implement callback for additional layers, especially IP fragmentation.
+    - `pcap_thread_set_callback_ipv4_frag()`
+    - `pcap_thread_set_callback_ipv6_frag()`
+    - `pcap_thread_set_callback_icmp()`
+    - `pcap_thread_set_callback_icmpv6()`
+    - Additional `pcap_thread_packet_t` fields:
+      - `have_icmphdr`: Indicate present of ICMP header
+      - `have_icmpv6hdr`: Indicate present of ICMPv6 header
+      - `have_tcpopts`: Indicate present of TCP options
+      - `icmphdr`: ICMP header
+      - `icmpv6hdr`: ICMPv6 header
+      - `tcpopts`: An array with a copy of the TCP options
+      - `tcpopts_len`: Total length of TCP options
+
+    IP fragmentation handling is hooked in with a callback object called
+    `pcap_thread_layer_callback_frag_t` that contains callbacks for:
+    - `new`: Create a new context, this is called per PCAP/interface
+    - `free`: Free the context
+    - `reassemble`: Called with the packet that needs reassembly, this
+      callback may return a fully reassembled packet.
+    - `release`: Called to release resources around a fully reassembled
+      packet after the packet has been passed to the next layers.
+    - Additional `pcap_thread_packet_t` fields:
+      - `ip6frag`: The IPv6 extension header for fragmentation
+      - `ip6frag_payload`: The protocol of the payload in the fragment
+      - `ip6rtdst`: The IPv6 destination address from the router extension
+        header if not the same as in `ip6hdr`
+
+    New IP fragmentation extension `pcap_thread_ext_frag.c|h`!
+    - Use `pcap_thread_ext_frag_conf_t` to configure
+    - Has two defragmentation modes
+      - `PCAP_THREAD_EXT_FRAG_REASSEMBLE_RFC791` will arrange fragments by
+        ascending offset, higher offset fragments will overwrite lower ones
+      - `PCAP_THREAD_EXT_FRAG_REASSEMBLE_BSD` will arrange fragments by
+        descending offset, lower offset fragments will overwrite higher ones
+    - Use `pcap_thread_ext_frag_layer_callback()` to generate a
+      `pcap_thread_layer_callback_frag_t` object and
+      `pcap_thread_set_callback_ipv4_frag()` /
+      `pcap_thread_set_callback_ipv6_frag()` to enable the extension
+
+    Breaking changes:
+    - When a fragmented packet is received and no callbacks are set to
+      handled them, the packets will get passed to the next layer if a
+      callback has been set. These packets will also be parse in a non-fatal
+      way so callbacks need to check packet state before processing, see
+      below.
+    - Layers and invalid callbacks can now get packets that are fragmented,
+      this is indicated with new packet states:
+      - `PCAP_THREAD_PACKET_IS_FRAGMENT`
+      - `PCAP_THREAD_PACKET_INVALID_FRAGMENT`
+      - `PCAP_THREAD_PACKET_FRAGMENTED_GREHDR`
+      - `PCAP_THREAD_PACKET_FRAGMENTED_ICMPHDR`
+      - `PCAP_THREAD_PACKET_FRAGMENTED_ICMPV6HDR`
+      - `PCAP_THREAD_PACKET_FRAGMENTED_UDPHDR`
+      - `PCAP_THREAD_PACKET_FRAGMENTED_TCPHDR`
+    - Additional packet states added:
+      - `PCAP_THREAD_PACKET_ENOMEM`: No more memory
+      - `PCAP_THREAD_PACKET_EMUTEX`: Mutex locking/unlocking error
+    - Not really breaking but `enum pcap_thread_packet_state` can be
+      represented with `pcap_thread_packet_state_t` now.
+
+    `hexdump`:
+    - New option `-F` to enable or configure IP fragmentation handling
+      - `-F <ip proto>` to enable defragmentation
+      - `-F m<ip prot><num>` to set maximum number of fragments
+      - `-F p<ip prot><num>` to set maximum number of fragments per packet
+      - `-F R<ip proto>` to reject overlapping fragments
+      - `-F t<ip proto>[sec]` to set enable/set timeout for fragments
+      - `-F d<ip proto><what>` for more output about fragmentations
+    - Add packet state in output, in both text and numerical
+    - Add `icmp` and `icmpv6` to `-L`
+
+    Bugfixes:
+    - Rearrange headers for compatibility with *BSD
+    - #36: Use `AC_HEADER_TIME` to include time functions
+    - Layer callback was not set if using non-threaded mode
+    - IPv4 addresses was incorrectly parse from IP header
+    - Check that `PCAP_TSTAMP_PRECISION_MICRO` macro exists instead of
+      function
+    - #97: Check for TCP options and offload into `tcpopts`
+
+    f6b5676 TCP options and IP fragments
+    201d4ce Fix warning that `_release()` is unused if compiled without
+            threads support
+    f897c1d IP fragmentation extension
+    c4e9dfa Append fragment payload length to the reassembled packet's
+            pkthdr len and caplen
+    c1819cf Check that `PCAP_TSTAMP_PRECISION_MICRO` macro exists instead
+            of function
+    3f8caf3 Also copy indicator of pkthdr when reassembling IP packets
+    55086bb Add test output to CLEANFILES
+    b2c812f Use defines for layer tracing
+    b357d3d Fix setting of IPv4 addresses from IP header
+    011e128 Fix bug where layer callback was not set if using non-threaded
+            mode
+    3e9926b Packet is a fragment
+    be359be Add ICMP/ICMPv6 callback layer support
+    450466a Issue DNS-OARC/dnscap#87: IP v4/v6 fragmentation
+    54200b1 Fix #36: Use `AC_HEADER_TIME`
+    bdd5755 Update code format
+    5746474 Rearrange headers for *BSD
+    8a74bd4 Format code
+    7472531 Format before format
+
 2017-06-06 Jerry Lundström
 
     Release pcap-thread 2.1.3

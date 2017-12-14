@@ -1,5 +1,6 @@
+#!/bin/sh -xe
 # Author Jerry Lundström <jerry@dns-oarc.net>
-# Copyright (c) 2016-2017, OARC, Inc.
+# Copyright (c) 2017, OARC, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,26 +32,19 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-AC_PREREQ(2.61)
-AC_INIT([hexdump], [2.0.0], [admin@dns-oarc.net], [hexdump], [https://github.com/DNS-OARC/pcap-thread/issues])
-AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
-AC_CONFIG_SRCDIR([hexdump.c])
-AC_CONFIG_HEADER([config.h])
-
-AC_PROG_CC
-AM_PROG_CC_C_O
-
-AC_HEADER_TIME
-
-AC_ARG_ENABLE([pthread],
-    [AS_HELP_STRING([--disable-pthread],
-        [disable the use of pthread])],
-    [],
-    [enable_pthread=yes])
-
-AS_IF([test "x$enable_pthread" != xno],
-    [AX_PCAP_THREAD],
-    [AX_PCAP_THREAD_PCAP])
-
-AC_CONFIG_FILES([Makefile test/Makefile])
-AC_OUTPUT
+for frag in 34 120 890; do
+    for pkt in 900 1120 1240 1400 1800; do
+        cat test3.sh | \
+            sed "s%@FRAG_SIZE@%$frag%g" | \
+            sed "s%@PKT_SIZE@%$pkt%g" \
+            > test3_${frag}_${pkt}.sh
+    done
+done
+for frag in 1255 1400 1600; do
+    for pkt in 2123 2345 2566; do
+        cat test3.sh | \
+            sed "s%@FRAG_SIZE@%$frag%g" | \
+            sed "s%@PKT_SIZE@%$pkt%g" \
+            > test3_${frag}_${pkt}.sh
+    done
+done

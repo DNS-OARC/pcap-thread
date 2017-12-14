@@ -34,16 +34,77 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = test*.log test*.trs \
-	dns.pcap.dist \
-    dns.out
+    *.pcap-dist \
+    dns.out \
+    test2.out \
+    test4.out \
+    test5.out \
+    test6.out
 
-TESTS = test1.sh
+TESTS = test1.sh test2.sh \
+    test3_120_1120.sh test3_120_1240.sh test3_120_1400.sh test3_120_1800.sh \
+    test3_120_900.sh test3_1255_2123.sh test3_1255_2345.sh test3_1255_2566.sh \
+    test3_1400_2123.sh test3_1400_2345.sh test3_1400_2566.sh \
+    test3_1600_2123.sh test3_1600_2345.sh test3_1600_2566.sh test3_34_1120.sh \
+    test3_34_1240.sh test3_34_1400.sh test3_34_1800.sh test3_34_900.sh \
+    test3_890_1120.sh test3_890_1240.sh test3_890_1400.sh test3_890_1800.sh \
+    test3_890_900.sh \
+    test4.sh \
+    test5.sh \
+    test6.sh
 
-test1.sh: dns.pcap.dist
+test1.sh: dns.pcap-dist
 
-dns.pcap.dist: dns.pcap
-	cp "$(srcdir)/dns.pcap" dns.pcap.dist
+test2.sh: v4_frag_dup_udp.pcap-dist v4_frag_empty_udp.pcap-dist \
+    v4_frag_nomf_udp.pcap-dist v4_frag_offset_offbyone1_udp.pcap-dist \
+    v4_frag_offset_offbyone2_udp.pcap-dist v4_frag_order_udp.pcap-dist \
+    v4_frag_skip_first_udp.pcap-dist v4_frag_skip_last_udp.pcap-dist \
+    v4_frag_skip_middle_udp.pcap-dist \
+    v4_frag_dup_tcp.pcap-dist v4_frag_empty_tcp.pcap-dist \
+    v4_frag_nomf_tcp.pcap-dist v4_frag_offset_offbyone1_tcp.pcap-dist \
+    v4_frag_offset_offbyone2_tcp.pcap-dist v4_frag_order_tcp.pcap-dist \
+    v4_frag_skip_first_tcp.pcap-dist v4_frag_skip_last_tcp.pcap-dist \
+    v4_frag_skip_middle_tcp.pcap-dist
+
+test4.sh: v6_frag_dup_udp.pcap-dist v6_frag_empty_udp.pcap-dist \
+    v6_frag_nomf_udp.pcap-dist v6_frag_offset_offbyone1_udp.pcap-dist \
+    v6_frag_offset_offbyone2_udp.pcap-dist v6_frag_order_udp.pcap-dist \
+    v6_frag_skip_first_udp.pcap-dist v6_frag_skip_last_udp.pcap-dist \
+    v6_frag_skip_middle_udp.pcap-dist \
+    v6_frag_dup_tcp.pcap-dist v6_frag_empty_tcp.pcap-dist \
+    v6_frag_nomf_tcp.pcap-dist v6_frag_offset_offbyone1_tcp.pcap-dist \
+    v6_frag_offset_offbyone2_tcp.pcap-dist v6_frag_order_tcp.pcap-dist \
+    v6_frag_skip_first_tcp.pcap-dist v6_frag_skip_last_tcp.pcap-dist \
+    v6_frag_skip_middle_tcp.pcap-dist
+
+test5.sh: icmp_fuzz.pcap-dist icmpv6_fuzz.pcap-dist
+
+test6.sh: v4_frag_timeout_udp.pcap-dist v6_frag_timeout_udp.pcap-dist \
+    v4_frag_timeout_tcp.pcap-dist v6_frag_timeout_tcp.pcap-dist
+
+.pcap.pcap-dist:
+	cp "$<" "$@"
 
 EXTRA_DIST = $(TESTS) \
-    dns.gold \
-    dns.pcap
+    dns.gold dns.pcap \
+    v4_frag_dup_udp.pcap v4_frag_empty_udp.pcap v4_frag_nomf_udp.pcap \
+    v4_frag_offset_offbyone1_udp.pcap v4_frag_offset_offbyone2_udp.pcap \
+    v4_frag_order_udp.pcap v4_frag_skip_first_udp.pcap v4_frag_skip_last_udp.pcap \
+    v4_frag_skip_middle_udp.pcap \
+    v4_frag_dup_tcp.pcap v4_frag_empty_tcp.pcap v4_frag_nomf_tcp.pcap \
+    v4_frag_offset_offbyone1_tcp.pcap v4_frag_offset_offbyone2_tcp.pcap \
+    v4_frag_order_tcp.pcap v4_frag_skip_first_tcp.pcap v4_frag_skip_last_tcp.pcap \
+    v4_frag_skip_middle_tcp.pcap \
+    test2.gold \
+    v6_frag_dup_udp.pcap v6_frag_empty_udp.pcap v6_frag_nomf_udp.pcap \
+    v6_frag_offset_offbyone1_udp.pcap v6_frag_offset_offbyone2_udp.pcap \
+    v6_frag_order_udp.pcap v6_frag_skip_first_udp.pcap v6_frag_skip_last_udp.pcap \
+    v6_frag_skip_middle_udp.pcap \
+    v6_frag_dup_tcp.pcap v6_frag_empty_tcp.pcap v6_frag_nomf_tcp.pcap \
+    v6_frag_offset_offbyone1_tcp.pcap v6_frag_offset_offbyone2_tcp.pcap \
+    v6_frag_order_tcp.pcap v6_frag_skip_first_tcp.pcap v6_frag_skip_last_tcp.pcap \
+    v6_frag_skip_middle_tcp.pcap \
+    test4.gold \
+    icmp_fuzz.pcap icmpv6_fuzz.pcap test5.gold \
+    v4_frag_timeout_udp.pcap v6_frag_timeout_udp.pcap test6.gold \
+    v4_frag_timeout_tcp.pcap v6_frag_timeout_tcp.pcap test6.gold

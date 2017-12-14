@@ -32,6 +32,6 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-../hexdump -r ./dns.pcap.dist >dns.out
+../hexdump -r ./dns.pcap-dist >dns.out
 
 diff dns.out "$srcdir/dns.gold"
