@@ -11,4 +11,5 @@ script:
   - ./configure
   - make
   - ./hexdump -h
+  - ( cd test && make cobadpkts ) || true
   - make test
