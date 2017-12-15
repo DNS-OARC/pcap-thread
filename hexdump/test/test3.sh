@@ -33,7 +33,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 workdir="$PWD/bad-packets"
-mkdir -p "$workdir"
 
 do_test() {
     files=`ls -1 "$workdir/"*.pcap 2>/dev/null`
@@ -47,5 +46,13 @@ do_test() {
     done
 }
 
-( cd "$srcdir/bad-packets" && make FRAG_PKT_SIZE=@PKT_SIZE@ FRAG_SIZE=@FRAG_SIZE@ NUM_PKTS=5 DESTDIR="$workdir" clean fuzz )
-do_test
+if [ -d "$srcdir/bad-packets" ]; then
+    mkdir -p "$workdir"
+    ( cd "$srcdir/bad-packets" && make FRAG_PKT_SIZE=@PKT_SIZE@ FRAG_SIZE=@FRAG_SIZE@ NUM_PKTS=5 DESTDIR="$workdir" clean fuzz )
+    do_test
+elif [ -d "$workdir" ]; then
+    ( cd "$workdir" && make FRAG_PKT_SIZE=@PKT_SIZE@ FRAG_SIZE=@FRAG_SIZE@ NUM_PKTS=5 clean fuzz )
+    do_test
+else
+    echo "bad-packets not found, skipping fuzz tests"
+fi
