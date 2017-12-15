@@ -31,7 +31,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in -rf bad-packets
 
 CLEANFILES = test*.log test*.trs \
     *.pcap-dist \
@@ -81,6 +81,12 @@ test5.sh: icmp_fuzz.pcap-dist icmpv6_fuzz.pcap-dist
 
 test6.sh: v4_frag_timeout_udp.pcap-dist v6_frag_timeout_udp.pcap-dist \
     v4_frag_timeout_tcp.pcap-dist v6_frag_timeout_tcp.pcap-dist
+
+cobadpkts: bad-packets/Makefile
+
+bad-packets/Makefile:
+	git clone https://github.com/DNS-OARC/bad-packets.git
+	cd bad-packets && git submodule update --init
 
 .pcap.pcap-dist:
 	cp "$<" "$@"
