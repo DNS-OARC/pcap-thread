@@ -1,3 +1,10 @@
+2017-12-15 Jerry Lundström
+
+    Release pcap-thread 3.0.1
+
+    95db71c Remove bad-packets and scapy as a submodule, was bloating dist
+            too much
+
 2017-12-14 Jerry Lundström
 
     Release pcap-thread 3.0.0, hexdump 2.0.0
