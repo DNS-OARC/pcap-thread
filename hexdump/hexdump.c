@@ -54,6 +54,8 @@
 #endif
 #include <unistd.h>
 
+int report_padding = 0;
+
 void layer(u_char* user, const pcap_thread_packet_t* packet, const u_char* payload, size_t length)
 {
     const pcap_thread_packet_t* first = packet;
@@ -78,6 +80,19 @@ void layer(u_char* user, const pcap_thread_packet_t* packet, const u_char* paylo
     }
     for (n = 0; n < length; n++) {
         printf("%02x", payload[n]);
+    }
+    if (report_padding) {
+        if (packet->have_ippadding) {
+            printf(" #");
+            for (n = 0; n < packet->ippadding; n++) {
+                printf("%02x", payload[length + n]);
+            }
+        } else if (packet->have_ip6padding) {
+            printf(" #");
+            for (n = 0; n < packet->ip6padding; n++) {
+                printf("%02x", payload[length + n]);
+            }
+        }
     }
     printf("\n");
 }
@@ -179,6 +194,19 @@ void invalid(u_char* user, const pcap_thread_packet_t* packet, const u_char* pay
     for (n = 0; n < length; n++) {
         printf("%02x", payload[n]);
     }
+    if (report_padding) {
+        if (packet->have_ippadding) {
+            printf(" #");
+            for (n = 0; n < packet->ippadding; n++) {
+                printf("%02x", payload[length + n]);
+            }
+        } else if (packet->have_ip6padding) {
+            printf(" #");
+            for (n = 0; n < packet->ip6padding; n++) {
+                printf("%02x", payload[length + n]);
+            }
+        }
+    }
     printf("\n");
 }
 
@@ -253,6 +281,19 @@ void ext_frag_callback(const pcap_thread_packet_t* packet, const u_char* payload
         for (n = 0; n < length; n++) {
             printf("%02x", payload[n]);
         }
+        if (report_padding) {
+            if (packet->have_ippadding) {
+                printf(" #");
+                for (n = 0; n < packet->ippadding; n++) {
+                    printf("%02x", payload[length + n]);
+                }
+            } else if (packet->have_ip6padding) {
+                printf(" #");
+                for (n = 0; n < packet->ip6padding; n++) {
+                    printf("%02x", payload[length + n]);
+                }
+            }
+        }
         printf("\n");
     } else if (packet->have_ip6frag) {
         printf("!#(%d) name:%s ts:%ld.%ld datalink:%s offset:%d len:%lu mf:%s data:",
@@ -265,6 +306,19 @@ void ext_frag_callback(const pcap_thread_packet_t* packet, const u_char* payload
             packet->ip6frag.ip6f_offlg & 0x1 ? "yes" : "no");
         for (n = 0; n < length; n++) {
             printf("%02x", payload[n]);
+        }
+        if (report_padding) {
+            if (packet->have_ippadding) {
+                printf(" #");
+                for (n = 0; n < packet->ippadding; n++) {
+                    printf("%02x", payload[length + n]);
+                }
+            } else if (packet->have_ip6padding) {
+                printf(" #");
+                for (n = 0; n < packet->ip6padding; n++) {
+                    printf("%02x", payload[length + n]);
+                }
+            }
         }
         printf("\n");
     }
@@ -280,6 +334,19 @@ void ext_frag_callback(const pcap_thread_packet_t* packet, const u_char* payload
             f->flag_more_fragments ? "yes" : "no");
         for (n = 0; n < f->length; n++) {
             printf("%02x", f->payload[n]);
+        }
+        if (report_padding) {
+            if (packet->have_ippadding) {
+                printf(" #");
+                for (n = 0; n < packet->ippadding; n++) {
+                    printf("%02x", payload[length + n]);
+                }
+            } else if (packet->have_ip6padding) {
+                printf(" #");
+                for (n = 0; n < packet->ip6padding; n++) {
+                    printf("%02x", payload[length + n]);
+                }
+            }
         }
         printf("\n");
     }
@@ -336,7 +403,7 @@ int main(int argc, char** argv)
         exit(4);
     }
 
-    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:a:vr:H:P:hDVA:c:L:F:")) != -1) {
+    while ((opt = getopt(argc, argv, "T:M:C:s:p:m:t:b:I:d:o:n:S:i:W:a:vr:H:P:hDVA:c:L:F:G")) != -1) {
         switch (opt) {
         case 'T':
             ret = pcap_thread_set_use_threads(&pt, atoi(optarg) ? 1 : 0);
@@ -512,6 +579,7 @@ int main(int argc, char** argv)
                 " -F t<ip prot>[sec] enable checking of timed out fragments and optionally\n"
                 "                    set the timeout in seconds\n"
                 " -F d<ip pro><what> enable reporting of: overlap, timeout\n"
+                " -G                 report padding if any\n"
                 " -D                 display stats on exit\n"
                 " -V                 display version and exit\n"
                 " -h                 this\n");
@@ -625,6 +693,9 @@ int main(int argc, char** argv)
                     err = -1;
             } else
                 err = -1;
+            break;
+        case 'G':
+            report_padding = 1;
             break;
         default:
             err = -1;
