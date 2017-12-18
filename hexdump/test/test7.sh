@@ -39,4 +39,7 @@ for pcap in ./padding ./missing_payload; do
     ../hexdump -L tcp -v -r "$pcap".pcap-dist >>test7.out
 done
 
+../hexdump -G -L udp -v -r ./padding.pcap-dist >>test7.out
+../hexdump -G -L tcp -v -r ./padding.pcap-dist >>test7.out
+
 diff test7.out "$srcdir/test7.gold"

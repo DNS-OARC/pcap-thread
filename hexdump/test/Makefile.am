@@ -43,13 +43,6 @@ CLEANFILES = test*.log test*.trs \
     test7.out
 
 TESTS = test1.sh test2.sh \
-    test3_120_1120.sh test3_120_1240.sh test3_120_1400.sh test3_120_1800.sh \
-    test3_120_900.sh test3_1255_2123.sh test3_1255_2345.sh test3_1255_2566.sh \
-    test3_1400_2123.sh test3_1400_2345.sh test3_1400_2566.sh \
-    test3_1600_2123.sh test3_1600_2345.sh test3_1600_2566.sh test3_34_1120.sh \
-    test3_34_1240.sh test3_34_1400.sh test3_34_1800.sh test3_34_900.sh \
-    test3_890_1120.sh test3_890_1240.sh test3_890_1400.sh test3_890_1800.sh \
-    test3_890_900.sh \
     test4.sh \
     test5.sh \
     test6.sh \
