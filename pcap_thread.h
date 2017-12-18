@@ -228,6 +228,8 @@ struct pcap_thread_packet {
     unsigned short have_udphdr : 1;
     unsigned short have_tcphdr : 1;
     unsigned short have_tcpopts : 1;
+    unsigned short have_ippadding : 1;
+    unsigned short have_ip6padding : 1;
 
     const char*                    name;
     int                            dlt;
@@ -325,6 +327,9 @@ struct pcap_thread_packet {
     } tcphdr;
     u_int8_t tcpopts[64];
     size_t   tcpopts_len;
+
+    size_t ippadding;
+    size_t ip6padding;
 
     pcap_thread_packet_state_t state;
 };

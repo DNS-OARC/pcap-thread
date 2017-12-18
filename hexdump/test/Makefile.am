@@ -39,7 +39,8 @@ CLEANFILES = test*.log test*.trs \
     test2.out \
     test4.out \
     test5.out \
-    test6.out
+    test6.out \
+    test7.out
 
 TESTS = test1.sh test2.sh \
     test3_120_1120.sh test3_120_1240.sh test3_120_1400.sh test3_120_1800.sh \
@@ -51,7 +52,8 @@ TESTS = test1.sh test2.sh \
     test3_890_900.sh \
     test4.sh \
     test5.sh \
-    test6.sh
+    test6.sh \
+    test7.sh
 
 test1.sh: dns.pcap-dist
 
@@ -82,7 +84,10 @@ test5.sh: icmp_fuzz.pcap-dist icmpv6_fuzz.pcap-dist
 test6.sh: v4_frag_timeout_udp.pcap-dist v6_frag_timeout_udp.pcap-dist \
     v4_frag_timeout_tcp.pcap-dist v6_frag_timeout_tcp.pcap-dist
 
+test7.sh: padding.pcap-dist missing_payload.pcap-dist
+
 cobadpkts: bad-packets/Makefile
+	cd bad-packets && test -d .git && git pull
 
 bad-packets/Makefile:
 	git clone https://github.com/DNS-OARC/bad-packets.git
@@ -113,4 +118,5 @@ EXTRA_DIST = $(TESTS) \
     test4.gold \
     icmp_fuzz.pcap icmpv6_fuzz.pcap test5.gold \
     v4_frag_timeout_udp.pcap v6_frag_timeout_udp.pcap test6.gold \
-    v4_frag_timeout_tcp.pcap v6_frag_timeout_tcp.pcap test6.gold
+    v4_frag_timeout_tcp.pcap v6_frag_timeout_tcp.pcap test6.gold \
+    padding.pcap missing_payload.pcap test7.gold

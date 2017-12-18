@@ -1856,6 +1856,24 @@ static void pcap_thread_callback_ipv4(u_char* user, pcap_thread_packet_t* packet
         layer_trace("have_iphdr");
 
         for (;;) {
+            /* Check reported length for missing payload or padding */
+            if (packet->iphdr.ip_len < (packet->iphdr.ip_hl * 4)) {
+                layer_trace("ip_len < ip header");
+                packet->state = PCAP_THREAD_PACKET_INVALID_IPV4;
+                break;
+            }
+            if (length < (packet->iphdr.ip_len - (packet->iphdr.ip_hl * 4))) {
+                layer_trace("length < (ip_len - ip header)");
+                packet->state = PCAP_THREAD_PACKET_INVALID_IPV4;
+                break;
+            }
+            if (length > (packet->iphdr.ip_len - (packet->iphdr.ip_hl * 4))) {
+                layer_trace("have_ippadding");
+                packet->ippadding      = length - (packet->iphdr.ip_len - (packet->iphdr.ip_hl * 4));
+                packet->have_ippadding = 1;
+                length -= packet->ippadding;
+            }
+
             /* Check if packet wants more fragments or has an offset */
             if (packet->iphdr.ip_off & 0x2000 || packet->iphdr.ip_off & 0x1fff) {
                 layer_trace("is_v4_frag");
@@ -2147,6 +2165,22 @@ static void pcap_thread_callback_ipv6(u_char* user, pcap_thread_packet_t* packet
         size_t         already_advanced = 0;
 
         layer_trace("have_ip6hdr");
+
+        /* Check reported length for missing payload or padding */
+        if (length < packet->ip6hdr.ip6_plen) {
+            layer_trace("length < ip6_plen");
+            packet->state = PCAP_THREAD_PACKET_INVALID_IPV6;
+            if (pcaplist->pcap_thread->callback_invalid) {
+                pcaplist->pcap_thread->callback_invalid(pcaplist->user, packet, orig, origlength);
+            }
+            return;
+        }
+        if (length > packet->ip6hdr.ip6_plen) {
+            layer_trace("have_ip6padding");
+            packet->ip6padding      = length - packet->ip6hdr.ip6_plen;
+            packet->have_ip6padding = 1;
+            length -= packet->ip6padding;
+        }
 
         ext.ip6e_nxt = packet->ip6hdr.ip6_nxt;
         ext.ip6e_len = 0;
