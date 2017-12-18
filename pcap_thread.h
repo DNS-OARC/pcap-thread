@@ -105,10 +105,10 @@ extern "C" {
 
 /* clang-format off */
 
-#define PCAP_THREAD_VERSION_STR     "3.0.1"
+#define PCAP_THREAD_VERSION_STR     "3.1.0"
 #define PCAP_THREAD_VERSION_MAJOR   3
-#define PCAP_THREAD_VERSION_MINOR   0
-#define PCAP_THREAD_VERSION_PATCH   1
+#define PCAP_THREAD_VERSION_MINOR   1
+#define PCAP_THREAD_VERSION_PATCH   0
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT       1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE    64
@@ -228,6 +228,8 @@ struct pcap_thread_packet {
     unsigned short have_udphdr : 1;
     unsigned short have_tcphdr : 1;
     unsigned short have_tcpopts : 1;
+    unsigned short have_ippadding : 1;
+    unsigned short have_ip6padding : 1;
 
     const char*                    name;
     int                            dlt;
@@ -325,6 +327,9 @@ struct pcap_thread_packet {
     } tcphdr;
     u_int8_t tcpopts[64];
     size_t   tcpopts_len;
+
+    size_t ippadding;
+    size_t ip6padding;
 
     pcap_thread_packet_state_t state;
 };

@@ -1,3 +1,24 @@
+2017-12-18 Jerry Lundström
+
+    Release pcap-thread 3.1.0, hexdump 2.1.0
+
+    Fix handling with IP packets that have padding or are missing some of
+    the payload. The padding data can be accessed by going beyond the length
+    of payload reported (see `hexdump -G`).
+
+    New `pcap_thread_packet_t` fields:
+    - `have_ippadding`: Indicate that the IPv4 packet has padding
+    - `have_ip6padding`: Indicate that the IPv6 packet has padding
+    - `ippadding`: The IPv4 padding length
+    - `ip6padding`: The IPv6 padding length
+
+    New `hexdump` option:
+    - Add option `-G` to report padding of IP packets
+
+    91b9703 Readd tests
+    c30295e `hexdump` report padding
+    f4e8b6f Padding and payload
+
 2017-12-15 Jerry Lundström
 
     Release pcap-thread 3.0.1
