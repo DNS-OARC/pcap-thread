@@ -581,7 +581,7 @@ const char* pcap_thread_filter(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const size_t filter_len);
 int pcap_thread_clear_filter(pcap_thread_t* pcap_thread);
 int pcap_thread_filter_errno(const pcap_thread_t* pcap_thread);
-int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread);
+int pcap_thread_filter_optimize(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter_optimize);
 bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);
 int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask);
