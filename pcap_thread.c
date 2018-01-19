@@ -526,7 +526,7 @@ int pcap_thread_filter_errno(const pcap_thread_t* pcap_thread)
     return pcap_thread->filter_errno;
 }
 
-int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread)
+int pcap_thread_filter_optimize(const pcap_thread_t* pcap_thread)
 {
     if (!pcap_thread) {
         return -1;

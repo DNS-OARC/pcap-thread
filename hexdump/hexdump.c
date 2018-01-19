@@ -783,7 +783,7 @@ int main(int argc, char** argv)
         default:
             printf("unknown\n");
         }
-        printf("filter_optimize: %s\n", pcap_thread_filter_optimze(&pt) ? "yes" : "no");
+        printf("filter_optimize: %s\n", pcap_thread_filter_optimize(&pt) ? "yes" : "no");
         printf("filter_netmask: 0x%x\n", pcap_thread_filter_netmask(&pt));
         printf("filter: %s\n", filter);
         printf("defrag_ipv4: %s\n", defrag_ipv4 ? "yes" : "no");
