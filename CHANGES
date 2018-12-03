@@ -1,3 +1,21 @@
+2018-12-03 Jerry Lundström
+
+    Release pcap-thread 4.0.0
+
+    Major version build due to renaming of an API function and various CI
+    improvements.
+
+    Fixes:
+    - Fix spelling of `pcap_thread_filter_optimize()`
+    - Fix `pcap_thread_next()` when using layers
+    - `reassemble()`:
+      - Check that we have `f_prev` before using it
+      - Free frag and return error if RFC815 since it's not complete yet
+
+    02fc33a clang scan, LGTM, configure
+    1a64e7d Fix `pcap_thread_next()` when using layers
+    75d8d72 Fix spelling of `pcap_thread_filter_optimize()`
+
 2017-12-18 Jerry Lundström
 
     Release pcap-thread 3.1.0, hexdump 2.1.0

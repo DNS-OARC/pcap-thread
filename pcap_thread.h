@@ -105,9 +105,9 @@ extern "C" {
 
 /* clang-format off */
 
-#define PCAP_THREAD_VERSION_STR     "3.1.0"
-#define PCAP_THREAD_VERSION_MAJOR   3
-#define PCAP_THREAD_VERSION_MINOR   1
+#define PCAP_THREAD_VERSION_STR     "4.0.0"
+#define PCAP_THREAD_VERSION_MAJOR   4
+#define PCAP_THREAD_VERSION_MINOR   0
 #define PCAP_THREAD_VERSION_PATCH   0
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT       1000
