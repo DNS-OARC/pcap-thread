@@ -352,7 +352,7 @@ void ext_frag_callback(const pcap_thread_packet_t* packet, const u_char* payload
     }
 }
 
-pcap_thread_t          pt                  = PCAP_THREAD_T_INIT;
+pcap_thread_t          pt                  = PCAP_THREAD_T_INIT; // lgtm [cpp/short-global-name]
 pcap_thread_pcaplist_t __pcaplist_not_used = PCAP_THREAD_PCAPLIST_T_INIT;
 
 void stop(int signum)
@@ -702,7 +702,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (err == -2) {
+    if (err == -2) { // lgtm [cpp/constant-comparison]
         fprintf(stderr, "Unsupported argument(s)\n");
         exit(1);
     }
@@ -783,7 +783,7 @@ int main(int argc, char** argv)
         default:
             printf("unknown\n");
         }
-        printf("filter_optimize: %s\n", pcap_thread_filter_optimze(&pt) ? "yes" : "no");
+        printf("filter_optimize: %s\n", pcap_thread_filter_optimize(&pt) ? "yes" : "no");
         printf("filter_netmask: 0x%x\n", pcap_thread_filter_netmask(&pt));
         printf("filter: %s\n", filter);
         printf("defrag_ipv4: %s\n", defrag_ipv4 ? "yes" : "no");

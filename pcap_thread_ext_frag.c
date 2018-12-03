@@ -419,7 +419,7 @@ static pcap_thread_packet_state_t reassemble(_ctx_t* ctx, const pcap_thread_pack
          * If first is not offset zero or last have more fragments flag,
          * we are missing fragments.
          */
-        if (!missing_frag && (frags->fragments->offset || f_prev->flag_more_fragments)) {
+        if (!missing_frag && (frags->fragments->offset || (f_prev && f_prev->flag_more_fragments))) {
             missing_frag = 1;
         }
         break;
@@ -433,6 +433,9 @@ static pcap_thread_packet_state_t reassemble(_ctx_t* ctx, const pcap_thread_pack
             }
         }
         */
+        free(frag->payload);
+        free(frag);
+        return PCAP_THREAD_EINVAL;
         break;
     case PCAP_THREAD_EXT_FRAG_REASSEMBLE_BSD:
         for (f_prev = 0, f = frags->fragments; f; f_prev = f, f = f->next) {
@@ -474,7 +477,7 @@ static pcap_thread_packet_state_t reassemble(_ctx_t* ctx, const pcap_thread_pack
          * If first (last on list) is not offset zero or last (first on
          * list) have more fragments flag, we are missing fragments.
          */
-        if (!missing_frag && (f_prev->offset || frags->fragments->flag_more_fragments)) {
+        if (!missing_frag && ((f_prev && f_prev->offset) || frags->fragments->flag_more_fragments)) {
             missing_frag = 1;
         }
         break;

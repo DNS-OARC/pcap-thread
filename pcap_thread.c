@@ -526,7 +526,7 @@ int pcap_thread_filter_errno(const pcap_thread_t* pcap_thread)
     return pcap_thread->filter_errno;
 }
 
-int pcap_thread_filter_optimze(const pcap_thread_t* pcap_thread)
+int pcap_thread_filter_optimize(const pcap_thread_t* pcap_thread)
 {
     if (!pcap_thread) {
         return -1;
@@ -3653,6 +3653,7 @@ int pcap_thread_next(pcap_thread_t* pcap_thread)
         return PCAP_THREAD_OK;
     }
 
+    pcap_thread->step->pcap_thread = pcap_thread;
     if (pcap_thread->callback_ipv4_frag.new && !pcap_thread->step->have_ipv4_frag_ctx) {
         pcap_thread->step->ipv4_frag_ctx      = pcap_thread->callback_ipv4_frag.new(pcap_thread->callback_ipv4_frag.conf, pcap_thread->step->user);
         pcap_thread->step->have_ipv4_frag_ctx = 1;
