@@ -352,7 +352,7 @@ void ext_frag_callback(const pcap_thread_packet_t* packet, const u_char* payload
     }
 }
 
-pcap_thread_t          pt                  = PCAP_THREAD_T_INIT;
+pcap_thread_t          pt                  = PCAP_THREAD_T_INIT; // lgtm [cpp/short-global-name]
 pcap_thread_pcaplist_t __pcaplist_not_used = PCAP_THREAD_PCAPLIST_T_INIT;
 
 void stop(int signum)
@@ -702,7 +702,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (err == -2) {
+    if (err == -2) { // lgtm [cpp/constant-comparison]
         fprintf(stderr, "Unsupported argument(s)\n");
         exit(1);
     }
