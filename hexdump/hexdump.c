@@ -732,11 +732,11 @@ int main(int argc, char** argv)
             exit(3);
         }
         if (filter_left != MAX_FILTER_SIZE) {
-            strncat(filterp, " ", 1);
+            memcpy(filterp, " ", 1);
             filterp++;
             filter_left--;
         }
-        strncat(filterp, argv[optind++], len);
+        memcpy(filterp, argv[optind++], len);
         filterp += len;
         filter_left -= len;
     }
