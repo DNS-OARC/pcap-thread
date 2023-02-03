@@ -103,24 +103,24 @@ struct pcap_thread_ext_frag_conf {
 };
 
 pcap_thread_ext_frag_conf_t* pcap_thread_ext_frag_conf_new(void);
-void pcap_thread_ext_frag_conf_free(pcap_thread_ext_frag_conf_t* conf);
+void                         pcap_thread_ext_frag_conf_free(pcap_thread_ext_frag_conf_t* conf);
 
-int pcap_thread_ext_frag_conf_reject_overlap(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_reject_overlap(pcap_thread_ext_frag_conf_t* conf, const int reject_overlap);
-int pcap_thread_ext_frag_conf_check_timeout(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_check_timeout(pcap_thread_ext_frag_conf_t* conf, const int check_timeout);
+int                                    pcap_thread_ext_frag_conf_reject_overlap(const pcap_thread_ext_frag_conf_t* conf);
+int                                    pcap_thread_ext_frag_conf_set_reject_overlap(pcap_thread_ext_frag_conf_t* conf, const int reject_overlap);
+int                                    pcap_thread_ext_frag_conf_check_timeout(const pcap_thread_ext_frag_conf_t* conf);
+int                                    pcap_thread_ext_frag_conf_set_check_timeout(pcap_thread_ext_frag_conf_t* conf, const int check_timeout);
 pcap_thread_ext_frag_reassemble_mode_t pcap_thread_ext_frag_conf_reassemble_mode(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_reassemble_mode(pcap_thread_ext_frag_conf_t* conf, const pcap_thread_ext_frag_reassemble_mode_t reassemble_mode);
-size_t pcap_thread_ext_frag_conf_fragments(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_fragments(pcap_thread_ext_frag_conf_t* conf, const size_t fragments);
-size_t pcap_thread_ext_frag_conf_per_packet(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_per_packet(pcap_thread_ext_frag_conf_t* conf, const size_t per_packet);
-struct timeval pcap_thread_ext_frag_conf_timeout(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_timeout(pcap_thread_ext_frag_conf_t* conf, const struct timeval timeout);
-pcap_thread_ext_frag_callback_t pcap_thread_ext_frag_conf_overlap_callback(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_overlap_callback(pcap_thread_ext_frag_conf_t* conf, pcap_thread_ext_frag_callback_t overlap_callback);
-pcap_thread_ext_frag_callback_t pcap_thread_ext_frag_conf_timeout_callback(const pcap_thread_ext_frag_conf_t* conf);
-int pcap_thread_ext_frag_conf_set_timeout_callback(pcap_thread_ext_frag_conf_t* conf, pcap_thread_ext_frag_callback_t timeout_callback);
+int                                    pcap_thread_ext_frag_conf_set_reassemble_mode(pcap_thread_ext_frag_conf_t* conf, const pcap_thread_ext_frag_reassemble_mode_t reassemble_mode);
+size_t                                 pcap_thread_ext_frag_conf_fragments(const pcap_thread_ext_frag_conf_t* conf);
+int                                    pcap_thread_ext_frag_conf_set_fragments(pcap_thread_ext_frag_conf_t* conf, const size_t fragments);
+size_t                                 pcap_thread_ext_frag_conf_per_packet(const pcap_thread_ext_frag_conf_t* conf);
+int                                    pcap_thread_ext_frag_conf_set_per_packet(pcap_thread_ext_frag_conf_t* conf, const size_t per_packet);
+struct timeval                         pcap_thread_ext_frag_conf_timeout(const pcap_thread_ext_frag_conf_t* conf);
+int                                    pcap_thread_ext_frag_conf_set_timeout(pcap_thread_ext_frag_conf_t* conf, const struct timeval timeout);
+pcap_thread_ext_frag_callback_t        pcap_thread_ext_frag_conf_overlap_callback(const pcap_thread_ext_frag_conf_t* conf);
+int                                    pcap_thread_ext_frag_conf_set_overlap_callback(pcap_thread_ext_frag_conf_t* conf, pcap_thread_ext_frag_callback_t overlap_callback);
+pcap_thread_ext_frag_callback_t        pcap_thread_ext_frag_conf_timeout_callback(const pcap_thread_ext_frag_conf_t* conf);
+int                                    pcap_thread_ext_frag_conf_set_timeout_callback(pcap_thread_ext_frag_conf_t* conf, pcap_thread_ext_frag_callback_t timeout_callback);
 
 pcap_thread_layer_callback_frag_t pcap_thread_ext_frag_layer_callback(pcap_thread_ext_frag_conf_t* conf);
 

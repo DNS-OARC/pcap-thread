@@ -509,6 +509,7 @@ struct pcap_thread {
     PCAP_THREAD_PCAPLIST_T_INIT_THREAD \
     { 0, 0 }, \
     0, \
+    0, { 0, 0 } \
 }
 /* clang-format on */
 
@@ -535,6 +536,9 @@ struct pcap_thread_pcaplist {
     struct bpf_program bpf;
 
     pcap_thread_callback_t layer_callback;
+
+    int             timedrun;
+    struct timespec end;
 };
 
 const char* pcap_thread_version_str(void);
@@ -544,57 +548,57 @@ int pcap_thread_version_minor(void);
 int pcap_thread_version_patch(void);
 
 pcap_thread_t* pcap_thread_create(void);
-void pcap_thread_free(pcap_thread_t* pcap_thread);
+void           pcap_thread_free(pcap_thread_t* pcap_thread);
 
-int pcap_thread_use_threads(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_use_threads(pcap_thread_t* pcap_thread, const int use_threads);
-int pcap_thread_use_layers(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_use_layers(pcap_thread_t* pcap_thread, const int use_layers);
-pcap_thread_queue_mode_t pcap_thread_queue_mode(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t queue_mode);
-struct timeval pcap_thread_queue_wait(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_queue_wait(pcap_thread_t* pcap_thread, const struct timeval queue_wait);
-pcap_thread_queue_mode_t pcap_thread_callback_queue_mode(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_callback_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t callback_queue_mode);
-struct timeval pcap_thread_callback_queue_wait(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_callback_queue_wait(pcap_thread_t* pcap_thread, const struct timeval callback_queue_wait);
-int pcap_thread_snapshot(const pcap_thread_t* pcap_thread);
-int pcap_thread_snaplen(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_snaplen(pcap_thread_t* pcap_thread, const int snaplen);
-int pcap_thread_promiscuous(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_promiscuous(pcap_thread_t* pcap_thread, const int promiscuous);
-int pcap_thread_monitor(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_monitor(pcap_thread_t* pcap_thread, const int monitor);
-int pcap_thread_timeout(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_timeout(pcap_thread_t* pcap_thread, const int timeout);
-int pcap_thread_buffer_size(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_buffer_size(pcap_thread_t* pcap_thread, const int buffer_size);
-int pcap_thread_timestamp_type(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_timestamp_type(pcap_thread_t* pcap_thread, const int timestamp_type);
-int pcap_thread_timestamp_precision(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_timestamp_precision(pcap_thread_t* pcap_thread, const int timestamp_precision);
-int pcap_thread_immediate_mode(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_immediate_mode(pcap_thread_t* pcap_thread, const int immediate_mode);
-pcap_direction_t pcap_thread_direction(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_direction(pcap_thread_t* pcap_thread, const pcap_direction_t direction);
-const char* pcap_thread_filter(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const size_t filter_len);
-int pcap_thread_clear_filter(pcap_thread_t* pcap_thread);
-int pcap_thread_filter_errno(const pcap_thread_t* pcap_thread);
-int pcap_thread_filter_optimize(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter_optimize);
-bpf_u_int32 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask);
-struct timeval pcap_thread_timedrun(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, const struct timeval timedrun);
-struct timeval pcap_thread_timedrun_to(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_timedrun_to(pcap_thread_t* pcap_thread, const struct timeval timedrun_to);
+int                         pcap_thread_use_threads(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_use_threads(pcap_thread_t* pcap_thread, const int use_threads);
+int                         pcap_thread_use_layers(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_use_layers(pcap_thread_t* pcap_thread, const int use_layers);
+pcap_thread_queue_mode_t    pcap_thread_queue_mode(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t queue_mode);
+struct timeval              pcap_thread_queue_wait(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_queue_wait(pcap_thread_t* pcap_thread, const struct timeval queue_wait);
+pcap_thread_queue_mode_t    pcap_thread_callback_queue_mode(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_callback_queue_mode(pcap_thread_t* pcap_thread, const pcap_thread_queue_mode_t callback_queue_mode);
+struct timeval              pcap_thread_callback_queue_wait(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_callback_queue_wait(pcap_thread_t* pcap_thread, const struct timeval callback_queue_wait);
+int                         pcap_thread_snapshot(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_snaplen(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_snaplen(pcap_thread_t* pcap_thread, const int snaplen);
+int                         pcap_thread_promiscuous(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_promiscuous(pcap_thread_t* pcap_thread, const int promiscuous);
+int                         pcap_thread_monitor(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_monitor(pcap_thread_t* pcap_thread, const int monitor);
+int                         pcap_thread_timeout(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_timeout(pcap_thread_t* pcap_thread, const int timeout);
+int                         pcap_thread_buffer_size(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_buffer_size(pcap_thread_t* pcap_thread, const int buffer_size);
+int                         pcap_thread_timestamp_type(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_timestamp_type(pcap_thread_t* pcap_thread, const int timestamp_type);
+int                         pcap_thread_timestamp_precision(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_timestamp_precision(pcap_thread_t* pcap_thread, const int timestamp_precision);
+int                         pcap_thread_immediate_mode(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_immediate_mode(pcap_thread_t* pcap_thread, const int immediate_mode);
+pcap_direction_t            pcap_thread_direction(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_direction(pcap_thread_t* pcap_thread, const pcap_direction_t direction);
+const char*                 pcap_thread_filter(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_filter(pcap_thread_t* pcap_thread, const char* filter, const size_t filter_len);
+int                         pcap_thread_clear_filter(pcap_thread_t* pcap_thread);
+int                         pcap_thread_filter_errno(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_filter_optimize(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_filter_optimize(pcap_thread_t* pcap_thread, const int filter_optimize);
+bpf_u_int32                 pcap_thread_filter_netmask(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_filter_netmask(pcap_thread_t* pcap_thread, const bpf_u_int32 filter_netmask);
+struct timeval              pcap_thread_timedrun(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_timedrun(pcap_thread_t* pcap_thread, const struct timeval timedrun);
+struct timeval              pcap_thread_timedrun_to(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_timedrun_to(pcap_thread_t* pcap_thread, const struct timeval timedrun_to);
 pcap_thread_activate_mode_t pcap_thread_activate_mode(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_activate_mode(pcap_thread_t* pcap_thread, const pcap_thread_activate_mode_t activate_mode);
-int pcap_thread_was_stopped(const pcap_thread_t* pcap_thread);
+int                         pcap_thread_set_activate_mode(pcap_thread_t* pcap_thread, const pcap_thread_activate_mode_t activate_mode);
+int                         pcap_thread_was_stopped(const pcap_thread_t* pcap_thread);
 
 size_t pcap_thread_queue_size(const pcap_thread_t* pcap_thread);
-int pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_size);
+int    pcap_thread_set_queue_size(pcap_thread_t* pcap_thread, const size_t queue_size);
 
 int pcap_thread_set_callback(pcap_thread_t* pcap_thread, pcap_thread_callback_t callback);
 int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t dropback);
@@ -629,7 +633,7 @@ int pcap_thread_stop(pcap_thread_t* pcap_thread);
 
 int pcap_thread_stats(pcap_thread_t* pcap_thread, pcap_thread_stats_callback_t callback, u_char* user);
 
-int pcap_thread_status(const pcap_thread_t* pcap_thread);
+int         pcap_thread_status(const pcap_thread_t* pcap_thread);
 const char* pcap_thread_errbuf(const pcap_thread_t* pcap_thread);
 const char* pcap_thread_strerr(int error);
 
