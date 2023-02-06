@@ -1,3 +1,19 @@
+2023-02-06 Jerry Lundström
+
+    Release pcap-thread 4.0.1
+
+    Fixed issue with `pcap_dispatch()` during non-threaded timed runs by
+    checking packet timestamp and use `pcap_breakloop()` if the run
+    should end.
+    Based on reports, it looks like `pcap_dispatch()` won't stop
+    processing if load is high enough even if documentation says "only
+    one bufferful of packets is read at a time".
+
+    8b72d7e Copyright
+    8f2370e Dispatch, error, hexdump, format
+    63502bb Bye Travis
+    5639468 Badges
+
 2018-12-03 Jerry Lundström
 
     Release pcap-thread 4.0.0
