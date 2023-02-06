@@ -1,6 +1,6 @@
 /*
  * Author Jerry Lundström <jerry@dns-oarc.net>
- * Copyright (c) 2016-2017, OARC, Inc.
+ * Copyright (c) 2016-2023, OARC, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,10 +51,10 @@
  * Forward declares for callbacks
  */
 
-static void* pcap_thread_layer_callback_frag_new(void* conf, u_char* user);
-static void pcap_thread_layer_callback_frag_free(void* _ctx);
+static void*                      pcap_thread_layer_callback_frag_new(void* conf, u_char* user);
+static void                       pcap_thread_layer_callback_frag_free(void* _ctx);
 static pcap_thread_packet_state_t pcap_thread_layer_callback_frag_reassemble(void* _ctx, const pcap_thread_packet_t* packet, const u_char* payload, size_t length, pcap_thread_packet_t** whole_packet, const u_char** whole_payload, size_t* whole_length);
-static void pcap_thread_layer_callback_frag_release(void* _ctx, const pcap_thread_packet_t* packet, const u_char* payload, size_t length);
+static void                       pcap_thread_layer_callback_frag_release(void* _ctx, const pcap_thread_packet_t* packet, const u_char* payload, size_t length);
 
 /*
  * Create/Free
@@ -599,7 +599,7 @@ static pcap_thread_packet_state_t reassemble_ipv4(_ctx_t* ctx, const pcap_thread
         ts.tv_usec %= 1000000;
         if (packet->pkthdr.ts.tv_sec > ts.tv_sec
             || (packet->pkthdr.ts.tv_sec == ts.tv_sec
-                   && packet->pkthdr.ts.tv_usec > ts.tv_usec)) {
+                && packet->pkthdr.ts.tv_usec > ts.tv_usec)) {
 
             pcap_thread_ext_frag_fragment_t* f;
 
@@ -695,7 +695,7 @@ static pcap_thread_packet_state_t reassemble_ipv6(_ctx_t* ctx, const pcap_thread
             && packet->ip6frag.ip6f_ident == frags->packet.ip6frag.ip6f_ident
             && !memcmp(&(packet->ip6hdr.ip6_src), &(frags->packet.ip6hdr.ip6_src), sizeof(struct in6_addr))
             && ((!packet->have_ip6rtdst && !memcmp(&(packet->ip6hdr.ip6_dst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr)))
-                   || (packet->have_ip6rtdst && !memcmp(&(packet->ip6rtdst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr))))) {
+                || (packet->have_ip6rtdst && !memcmp(&(packet->ip6rtdst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr))))) {
 
             layer_tracef("frags %x found", packet->ip6frag.ip6f_ident);
 
@@ -721,7 +721,7 @@ static pcap_thread_packet_state_t reassemble_ipv6(_ctx_t* ctx, const pcap_thread
         ts.tv_usec %= 1000000;
         if (packet->pkthdr.ts.tv_sec > ts.tv_sec
             || (packet->pkthdr.ts.tv_sec == ts.tv_sec
-                   && packet->pkthdr.ts.tv_usec > ts.tv_usec)) {
+                && packet->pkthdr.ts.tv_usec > ts.tv_usec)) {
 
             pcap_thread_ext_frag_fragment_t* f;
 
@@ -836,7 +836,7 @@ static void _release(_ctx_t* ctx, const pcap_thread_packet_t* packet)
                    && packet->ip6frag.ip6f_ident == frags->packet.ip6frag.ip6f_ident
                    && !memcmp(&(packet->ip6hdr.ip6_src), &(frags->packet.ip6hdr.ip6_src), sizeof(struct in6_addr))
                    && ((!packet->have_ip6rtdst && !memcmp(&(packet->ip6hdr.ip6_dst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr)))
-                          || (packet->have_ip6rtdst && !memcmp(&(packet->ip6rtdst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr))))) {
+                       || (packet->have_ip6rtdst && !memcmp(&(packet->ip6rtdst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr))))) {
 
             layer_tracef("release frags %x", packet->ip6frag.ip6f_ident);
             break;
@@ -971,10 +971,10 @@ static void pcap_thread_layer_callback_frag_release(void* _ctx, const pcap_threa
                 && packet->iphdr.ip_src.s_addr == frags->packet.iphdr.ip_src.s_addr
                 && packet->iphdr.ip_dst.s_addr == frags->packet.iphdr.ip_dst.s_addr)
             || (frags->packet.have_ip6hdr
-                   && packet->ip6frag.ip6f_ident == frags->packet.ip6frag.ip6f_ident
-                   && !memcmp(&(packet->ip6hdr.ip6_src), &(frags->packet.ip6hdr.ip6_src), sizeof(struct in6_addr))
-                   && ((!packet->have_ip6rtdst && !memcmp(&(packet->ip6hdr.ip6_dst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr)))
-                          || (packet->have_ip6rtdst && !memcmp(&(packet->ip6rtdst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr)))))) {
+                && packet->ip6frag.ip6f_ident == frags->packet.ip6frag.ip6f_ident
+                && !memcmp(&(packet->ip6hdr.ip6_src), &(frags->packet.ip6hdr.ip6_src), sizeof(struct in6_addr))
+                && ((!packet->have_ip6rtdst && !memcmp(&(packet->ip6hdr.ip6_dst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr)))
+                    || (packet->have_ip6rtdst && !memcmp(&(packet->ip6rtdst), &(frags->packet.ip6hdr.ip6_dst), sizeof(struct in6_addr)))))) {
 
             /* Found it, remove from list */
             if (frags_prev) {

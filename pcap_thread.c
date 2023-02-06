@@ -1,6 +1,6 @@
 /*
  * Author Jerry Lundström <jerry@dns-oarc.net>
- * Copyright (c) 2016-2017, OARC, Inc.
+ * Copyright (c) 2016-2023, OARC, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1322,7 +1322,7 @@ static void pcap_thread_callback(u_char* user, const struct pcap_pkthdr* pkthdr,
             pcap_thread_callback_linux_sll((void*)pcaplist, &packet, pkt, length);
         return;
 
-    /* TODO: These might be interesting to implement
+        /* TODO: These might be interesting to implement
         case DLT_IPNET:
         case DLT_PKTAP:
         */
@@ -3206,7 +3206,7 @@ static void* _thread(void* vp)
     while (pcaplist->running) {
         pthread_testcancel();
         ret = pcap_loop(pcaplist->pcap, -1, _callback, (u_char*)pcaplist);
-        if (ret == -1) {
+        if (ret == PCAP_ERROR) {
             /* TODO: Store pcap_loop() error */
             break;
         }
@@ -3244,6 +3244,12 @@ static void _callback2(u_char* user, const struct pcap_pkthdr* pkthdr, const u_c
     } else {
         pcaplist->running = 0;
     }
+
+    if (pcaplist->timedrun
+        && (pkthdr->ts.tv_sec > pcaplist->end.tv_sec
+            || (pkthdr->ts.tv_sec == pcaplist->end.tv_sec && (pkthdr->ts.tv_usec * 1000) >= pcaplist->end.tv_nsec))) {
+        pcap_breakloop(pcaplist->pcap);
+    }
 }
 
 int pcap_thread_run(pcap_thread_t* pcap_thread)
@@ -3264,18 +3270,18 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
     }
     if (pcap_thread->use_layers
         && !(pcap_thread->callback_linux_sll
-               || pcap_thread->callback_ether
-               || pcap_thread->callback_null
-               || pcap_thread->callback_loop
-               || pcap_thread->callback_ieee802
-               || pcap_thread->callback_gre
-               || pcap_thread->callback_ip
-               || pcap_thread->callback_ipv4
-               || pcap_thread->callback_ipv6
-               || pcap_thread->callback_icmp
-               || pcap_thread->callback_icmpv6
-               || pcap_thread->callback_udp
-               || pcap_thread->callback_tcp)) {
+             || pcap_thread->callback_ether
+             || pcap_thread->callback_null
+             || pcap_thread->callback_loop
+             || pcap_thread->callback_ieee802
+             || pcap_thread->callback_gre
+             || pcap_thread->callback_ip
+             || pcap_thread->callback_ipv4
+             || pcap_thread->callback_ipv6
+             || pcap_thread->callback_icmp
+             || pcap_thread->callback_icmpv6
+             || pcap_thread->callback_udp
+             || pcap_thread->callback_tcp)) {
         return PCAP_THREAD_NOCALLBACK;
     }
     if (pcap_thread->running) {
@@ -3529,7 +3535,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
                 pcaplist->ipv6_frag_ctx      = pcap_thread->callback_ipv6_frag.new(pcap_thread->callback_ipv6_frag.conf, pcaplist->user);
                 pcaplist->have_ipv6_frag_ctx = 1;
             }
-            pcaplist->running = 1;
+            pcaplist->running  = 1;
+            pcaplist->timedrun = timedrun;
+            pcaplist->end      = end;
         }
 
         t1.tv_sec  = pcap_thread->timeout / 1000;
@@ -3590,12 +3598,13 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
                 }
 
                 packets = pcap_dispatch(pcaplist->pcap, -1, _callback2, (u_char*)pcaplist);
-                if (packets == -1) {
+                if (packets == PCAP_ERROR) {
                     pcap_thread->status = -1;
                     PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_dispatch()");
                     pcap_thread->running = 0;
                     return PCAP_THREAD_EPCAP;
-                } else if (packets == -2 || (pcaplist->is_offline && !packets)) {
+                }
+                if (pcaplist->is_offline && !packets) {
                     pcaplist->running = 0;
                 }
             }
@@ -3620,18 +3629,18 @@ int pcap_thread_next(pcap_thread_t* pcap_thread)
     }
     if (pcap_thread->use_layers
         && !(pcap_thread->callback_linux_sll
-               || pcap_thread->callback_ether
-               || pcap_thread->callback_null
-               || pcap_thread->callback_loop
-               || pcap_thread->callback_ieee802
-               || pcap_thread->callback_gre
-               || pcap_thread->callback_ip
-               || pcap_thread->callback_ipv4
-               || pcap_thread->callback_ipv6
-               || pcap_thread->callback_icmp
-               || pcap_thread->callback_icmpv6
-               || pcap_thread->callback_udp
-               || pcap_thread->callback_tcp)) {
+             || pcap_thread->callback_ether
+             || pcap_thread->callback_null
+             || pcap_thread->callback_loop
+             || pcap_thread->callback_ieee802
+             || pcap_thread->callback_gre
+             || pcap_thread->callback_ip
+             || pcap_thread->callback_ipv4
+             || pcap_thread->callback_ipv6
+             || pcap_thread->callback_icmp
+             || pcap_thread->callback_icmpv6
+             || pcap_thread->callback_udp
+             || pcap_thread->callback_tcp)) {
         return PCAP_THREAD_NOCALLBACK;
     }
     if (pcap_thread->running) {

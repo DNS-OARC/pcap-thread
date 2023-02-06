@@ -1,6 +1,6 @@
 /*
  * Author Jerry Lundström <jerry@dns-oarc.net>
- * Copyright (c) 2016-2017, OARC, Inc.
+ * Copyright (c) 2016-2023, OARC, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -732,11 +732,11 @@ int main(int argc, char** argv)
             exit(3);
         }
         if (filter_left != MAX_FILTER_SIZE) {
-            strncat(filterp, " ", 1);
+            memcpy(filterp, " ", 1);
             filterp++;
             filter_left--;
         }
-        strncat(filterp, argv[optind++], len);
+        memcpy(filterp, argv[optind++], len);
         filterp += len;
         filter_left -= len;
     }

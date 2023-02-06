@@ -1,6 +1,6 @@
 #!/bin/sh -xe
 # Author Jerry Lundström <jerry@dns-oarc.net>
-# Copyright (c) 2017, OARC, Inc.
+# Copyright (c) 2017-2023, OARC, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without

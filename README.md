@@ -1,7 +1,5 @@
 # pcap-thread
 
-[![Build Status](https://travis-ci.org/DNS-OARC/pcap-thread.svg?branch=develop)](https://travis-ci.org/DNS-OARC/pcap-thread) [![Coverity Scan Build Status](https://scan.coverity.com/projects/10010/badge.svg)](https://scan.coverity.com/projects/dns-oarc-pcap-thread)
-
 PCAP helper library with POSIX threads support and transport layer callbacks
 
 ## About
@@ -88,7 +86,7 @@ Jerry Lundström <jerry@dns-oarc.net>
 
 ## Copyright and license
 
-Copyright (c) 2016-2017, OARC, Inc.
+Copyright (c) 2016-2023, OARC, Inc.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
