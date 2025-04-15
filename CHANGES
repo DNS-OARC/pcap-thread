@@ -1,3 +1,11 @@
+2025-04-15 Jerry Lundström
+
+    Release pcap-thread 4.1.0
+
+    Add support for link-type Linux cooked v2.
+
+    5f0810f DLT_LINUX_SLL2
+
 2023-02-06 Jerry Lundström
 
     Release pcap-thread 4.0.1
