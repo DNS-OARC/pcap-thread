@@ -32,27 +32,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-workdir="$PWD/bad-packets"
+../hexdump -r ./sll2.pcap-dist >sll2.out
+../hexdump -r ./sll2.pcap-dist -L udp >>sll2.out
 
-do_test() {
-    files=`ls -1 "$workdir/"*.pcap 2>/dev/null`
-    if [ -z "$files" ]; then
-        echo "No PCAP files generated"
-        exit 1
-    fi
-
-    for file in $files; do
-        ../hexdump -F 4 -F R4 -F p4100 -F 6 -F R6 -F p6100 -L udp -v -r "$file"
-    done
-}
-
-if [ -d "$srcdir/bad-packets" ]; then
-    mkdir -p "$workdir"
-    ( cd "$srcdir/bad-packets" && make FRAG_PKT_SIZE=1120 FRAG_SIZE=34 NUM_PKTS=5 DESTDIR="$workdir" clean fuzz )
-    do_test
-elif [ -d "$workdir" ]; then
-    ( cd "$workdir" && make FRAG_PKT_SIZE=1120 FRAG_SIZE=34 NUM_PKTS=5 clean fuzz )
-    do_test
-else
-    echo "bad-packets not found, skipping fuzz tests"
-fi
+diff sll2.out "$srcdir/sll2.gold"

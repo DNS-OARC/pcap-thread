@@ -16,7 +16,7 @@ config.status
 pcap_thread.c
 pcap_thread.h
 stamp-h1
-hexdump
+./hexdump
 test-driver
 build/
 config.h.in

@@ -1,5 +1,5 @@
 # Author Jerry Lundström <jerry@dns-oarc.net>
-# Copyright (c) 2017-2023, OARC, Inc.
+# Copyright (c) 2017-2025 OARC, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -40,7 +40,8 @@ CLEANFILES = test*.log test*.trs \
     test4.out \
     test5.out \
     test6.out \
-    test7.out
+    test7.out \
+    sll2.out
 
 TESTS = test1.sh test2.sh \
     test3_120_1120.sh test3_120_1240.sh test3_120_1400.sh test3_120_1800.sh \
@@ -53,7 +54,8 @@ TESTS = test1.sh test2.sh \
     test4.sh \
     test5.sh \
     test6.sh \
-    test7.sh
+    test7.sh \
+    test_sll2.sh
 
 test1.sh: dns.pcap-dist
 
@@ -85,6 +87,8 @@ test6.sh: v4_frag_timeout_udp.pcap-dist v6_frag_timeout_udp.pcap-dist \
     v4_frag_timeout_tcp.pcap-dist v6_frag_timeout_tcp.pcap-dist
 
 test7.sh: padding.pcap-dist missing_payload.pcap-dist
+
+test_sll2.sh: sll2.pcap-dist
 
 cobadpkts: bad-packets/Makefile
 	cd bad-packets && test -d .git && git pull
@@ -119,4 +123,5 @@ EXTRA_DIST = $(TESTS) \
     icmp_fuzz.pcap icmpv6_fuzz.pcap test5.gold \
     v4_frag_timeout_udp.pcap v6_frag_timeout_udp.pcap test6.gold \
     v4_frag_timeout_tcp.pcap v6_frag_timeout_tcp.pcap test6.gold \
-    padding.pcap missing_payload.pcap test7.gold
+    padding.pcap missing_payload.pcap test7.gold \
+    sll2.pcap sll2.gold

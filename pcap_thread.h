@@ -1,6 +1,6 @@
 /*
  * Author Jerry Lundström <jerry@dns-oarc.net>
- * Copyright (c) 2016-2023, OARC, Inc.
+ * Copyright (c) 2016-2025 OARC, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -105,10 +105,10 @@ extern "C" {
 
 /* clang-format off */
 
-#define PCAP_THREAD_VERSION_STR     "4.0.1"
+#define PCAP_THREAD_VERSION_STR     "4.1.0"
 #define PCAP_THREAD_VERSION_MAJOR   4
-#define PCAP_THREAD_VERSION_MINOR   0
-#define PCAP_THREAD_VERSION_PATCH   1
+#define PCAP_THREAD_VERSION_MINOR   1
+#define PCAP_THREAD_VERSION_PATCH   0
 
 #define PCAP_THREAD_DEFAULT_TIMEOUT       1000
 #define PCAP_THREAD_DEFAULT_QUEUE_SIZE    64
@@ -154,6 +154,15 @@ struct pcap_thread_linux_sll {
     uint16_t link_layer_address_length;
     uint8_t  link_layer_address[8];
     uint16_t ether_type;
+};
+struct pcap_thread_linux_sll2 {
+    uint16_t protocol_type;
+    uint16_t reserved;
+    uint32_t interface_index;
+    uint16_t arphrd_type;
+    uint8_t  packet_type;
+    uint8_t  link_layer_address_length;
+    uint8_t  link_layer_address[8];
 };
 struct pcap_thread_null_hdr {
     uint32_t family;
@@ -205,7 +214,8 @@ enum pcap_thread_packet_state {
     PCAP_THREAD_PACKET_FRAGMENTED_ICMPHDR,
     PCAP_THREAD_PACKET_FRAGMENTED_ICMPV6HDR,
     PCAP_THREAD_PACKET_FRAGMENTED_UDPHDR,
-    PCAP_THREAD_PACKET_FRAGMENTED_TCPHDR
+    PCAP_THREAD_PACKET_FRAGMENTED_TCPHDR,
+    PCAP_THREAD_PACKET_INVALID_LINUX_SLL2
 };
 
 typedef struct pcap_thread_packet pcap_thread_packet_t;
@@ -213,6 +223,7 @@ struct pcap_thread_packet {
     unsigned short have_prevpkt : 1;
     unsigned short have_pkthdr : 1;
     unsigned short have_linux_sll : 1;
+    unsigned short have_linux_sll2 : 1;
     unsigned short have_ethhdr : 1;
     unsigned short have_nullhdr : 1;
     unsigned short have_loophdr : 1;
@@ -236,6 +247,7 @@ struct pcap_thread_packet {
     pcap_thread_packet_t*          prevpkt;
     struct pcap_pkthdr             pkthdr;
     struct pcap_thread_linux_sll   linux_sll;
+    struct pcap_thread_linux_sll2  linux_sll2;
     struct ether_header            ethhdr;
     struct pcap_thread_null_hdr    nullhdr;
     struct pcap_thread_loop_hdr    loophdr;
@@ -410,7 +422,7 @@ struct pcap_thread_layer_callback_frag {
     0, "", 0, 0, \
     { 0, 0 }, { 0, 0 }, \
     PCAP_THREAD_DEFAULT_ACTIVATE_MODE, \
-    0, 0, 0, 0, 0, 0, 0, 0, PCAP_THREAD_LAYER_CALLBACK_FRAG_T_INIT, 0, PCAP_THREAD_LAYER_CALLBACK_FRAG_T_INIT, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, PCAP_THREAD_LAYER_CALLBACK_FRAG_T_INIT, 0, PCAP_THREAD_LAYER_CALLBACK_FRAG_T_INIT, 0, 0, 0, 0, \
     0 \
 }
 /* clang-format on */
@@ -475,6 +487,7 @@ struct pcap_thread {
     pcap_thread_activate_mode_t activate_mode;
 
     pcap_thread_layer_callback_t      callback_linux_sll;
+    pcap_thread_layer_callback_t      callback_linux_sll2;
     pcap_thread_layer_callback_t      callback_ether;
     pcap_thread_layer_callback_t      callback_null;
     pcap_thread_layer_callback_t      callback_loop;
@@ -604,6 +617,7 @@ int pcap_thread_set_callback(pcap_thread_t* pcap_thread, pcap_thread_callback_t 
 int pcap_thread_set_dropback(pcap_thread_t* pcap_thread, pcap_thread_callback_t dropback);
 
 int pcap_thread_set_callback_linux_sll(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_linux_sll);
+int pcap_thread_set_callback_linux_sll2(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_linux_sll2);
 int pcap_thread_set_callback_ether(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_ether);
 int pcap_thread_set_callback_null(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_null);
 int pcap_thread_set_callback_loop(pcap_thread_t* pcap_thread, pcap_thread_layer_callback_t callback_loop);
