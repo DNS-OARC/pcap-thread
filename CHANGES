@@ -1,3 +1,12 @@
+2025-04-23 Jerry Lundström
+
+    Release pcap-thread 4.1.1
+
+    Added check for `DLT_LINUX_SLL2` in `AX_PCAP_THREAD_PCAP`, which was
+    added in libpcap v1.10.0, and updated bundled m4 scripts.
+
+    5129594 SLL2, m4
+
 2025-04-15 Jerry Lundström
 
     Release pcap-thread 4.1.0
