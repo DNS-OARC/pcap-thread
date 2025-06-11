@@ -31,11 +31,11 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-AC_PREREQ(2.61)
-AC_INIT([hexdump], [2.1.0], [admin@dns-oarc.net], [hexdump], [https://github.com/DNS-OARC/pcap-thread/issues])
+AC_PREREQ([2.69])
+AC_INIT([hexdump],[2.1.0],[admin@dns-oarc.net],[hexdump],[https://github.com/DNS-OARC/pcap-thread/issues])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_CONFIG_SRCDIR([hexdump.c])
-AC_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([../m4])
 
 AC_PROG_CC
@@ -55,8 +55,6 @@ AC_ARG_WITH([extra-ldflags], [AS_HELP_STRING([--with-extra-ldflags=CFLAGS], [Add
   AC_MSG_NOTICE([appending extra LDFLAGS... $withval])
   AS_VAR_APPEND(LDFLAGS, [" $withval"])
 ])
-
-AC_HEADER_TIME
 
 AC_ARG_ENABLE([pthread],
     [AS_HELP_STRING([--disable-pthread],

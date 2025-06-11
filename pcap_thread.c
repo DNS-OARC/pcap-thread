@@ -2999,6 +2999,29 @@ int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void* user)
 
 int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user)
 {
+    FILE* fp;
+    int   ret;
+
+    if (!file) {
+        return PCAP_THREAD_EINVAL;
+    }
+
+    if (!strcmp(file, "-")) {
+        return pcap_thread_open_offline_fp(pcap_thread, file, stdin, user);
+    }
+
+    if (!(fp = fopen(file, "r"))) {
+        return PCAP_THREAD_ERRNO;
+    }
+    if ((ret = pcap_thread_open_offline_fp(pcap_thread, file, fp, user))) {
+        fclose(fp);
+    }
+
+    return ret;
+}
+
+int pcap_thread_open_offline_fp(pcap_thread_t* pcap_thread, const char* file, FILE* fp, void* user)
+{
     pcap_t*                 pcap;
     pcap_thread_pcaplist_t* pcaplist;
     int                     snapshot;
@@ -3007,6 +3030,9 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
         return PCAP_THREAD_EINVAL;
     }
     if (!file) {
+        return PCAP_THREAD_EINVAL;
+    }
+    if (!fp) {
         return PCAP_THREAD_EINVAL;
     }
     if (pcap_thread->running) {
@@ -3028,9 +3054,11 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
         return PCAP_THREAD_ENOMEM;
     }
 
+    pcaplist->fp = fp;
+
 #ifdef HAVE_PCAP_OPEN_OFFLINE_WITH_TSTAMP_PRECISION
     if (pcap_thread->have_timestamp_precision) {
-        if (!(pcap = pcap_open_offline_with_tstamp_precision(pcaplist->name, pcap_thread->timestamp_precision, pcap_thread->errbuf))) {
+        if (!(pcap = pcap_fopen_offline_with_tstamp_precision(pcaplist->fp, pcap_thread->timestamp_precision, pcap_thread->errbuf))) {
             free(pcaplist->name);
             free(pcaplist);
             return PCAP_THREAD_EPCAP;
@@ -3038,7 +3066,7 @@ int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void*
     } else
 #endif
     {
-        if (!(pcap = pcap_open_offline(pcaplist->name, pcap_thread->errbuf))) {
+        if (!(pcap = pcap_fopen_offline(pcaplist->fp, pcap_thread->errbuf))) {
             free(pcaplist->name);
             free(pcaplist);
             return PCAP_THREAD_EPCAP;
@@ -3234,6 +3262,24 @@ int pcap_thread_close(pcap_thread_t* pcap_thread)
 #endif
 
     return PCAP_THREAD_OK;
+}
+
+long pcap_thread_ftell(pcap_thread_t* pcap_thread)
+{
+    if (!pcap_thread) {
+        return -1;
+    }
+    if (!pcap_thread->running) {
+        return -1;
+    }
+    if (!pcap_thread->step) {
+        return -1;
+    }
+    if (!pcap_thread->step->fp) {
+        return -1;
+    }
+
+    return ftell(pcap_thread->step->fp);
 }
 
 /*
@@ -3444,9 +3490,17 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
         end.tv_nsec = pcap_thread->timedrun_to.tv_usec * 1000;
     }
 
+    int all_offline = 1;
+    for (pcaplist = pcap_thread->pcaplist; all_offline && pcaplist; pcaplist = pcaplist->next) {
+        if (!pcaplist->is_offline) {
+            all_offline = 0;
+            break;
+        }
+    }
+
 #ifdef HAVE_PTHREAD
     if (pcap_thread->use_threads) {
-        int err, all_offline;
+        int err;
 
         switch (pcap_thread->queue_mode) {
         case PCAP_THREAD_QUEUE_MODE_COND:
@@ -3498,17 +3552,10 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
         pcap_thread->write_pos = 0;
         pcap_thread->pkts      = 0;
 
-        all_offline = 1;
-        for (pcaplist = pcap_thread->pcaplist; all_offline && pcaplist; pcaplist = pcaplist->next) {
-            if (!pcaplist->is_offline) {
-                all_offline = 0;
-                break;
-            }
-        }
-
         pcap_thread->running     = 1;
         pcap_thread->was_stopped = 0;
         err                      = PCAP_THREAD_OK;
+        pcap_thread->step        = 0;
 
         for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
             pcaplist->pcap_thread = pcap_thread;
@@ -3635,9 +3682,9 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
 
         pcap_thread->running = 0;
         return err;
-    } else
+    }
 #endif
-    {
+    if (!all_offline) {
         fd_set         fds, rfds;
         int            max_fd = 0;
         struct timeval t1, t2;
@@ -3730,6 +3777,89 @@ int pcap_thread_run(pcap_thread_t* pcap_thread)
                 } else {
                     run = 1;
                 }
+
+                pcap_thread->step = pcaplist;
+
+                packets = pcap_dispatch(pcaplist->pcap, -1, _callback2, (u_char*)pcaplist);
+                if (packets == PCAP_ERROR) {
+                    pcap_thread->status = -1;
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "pcap_dispatch()");
+                    pcap_thread->running = 0;
+                    return PCAP_THREAD_EPCAP;
+                }
+                if (pcaplist->is_offline && !packets) {
+                    pcaplist->running = 0;
+                }
+            }
+        }
+
+        pcap_thread->running = 0;
+    } else {
+        pcap_thread->running     = 1;
+        pcap_thread->was_stopped = 0;
+
+        for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+            pcaplist->pcap_thread = pcap_thread;
+            if (pcap_thread->use_layers) {
+                pcaplist->layer_callback = &pcap_thread_callback;
+            }
+            if (pcap_thread->callback_ipv4_frag.new && !pcaplist->have_ipv4_frag_ctx) {
+                pcaplist->ipv4_frag_ctx      = pcap_thread->callback_ipv4_frag.new(pcap_thread->callback_ipv4_frag.conf, pcaplist->user);
+                pcaplist->have_ipv4_frag_ctx = 1;
+            }
+            if (pcap_thread->callback_ipv6_frag.new && !pcaplist->have_ipv6_frag_ctx) {
+                pcaplist->ipv6_frag_ctx      = pcap_thread->callback_ipv6_frag.new(pcap_thread->callback_ipv6_frag.conf, pcaplist->user);
+                pcaplist->have_ipv6_frag_ctx = 1;
+            }
+            pcaplist->running  = 1;
+            pcaplist->timedrun = timedrun;
+            pcaplist->end      = end;
+        }
+
+        while (run) {
+            if (timedrun) {
+                struct timeval now;
+                struct timeval diff;
+
+                if (gettimeofday(&now, 0)) {
+                    PCAP_THREAD_SET_ERRBUF(pcap_thread, "gettimeofday()");
+                    pcap_thread->running = 0;
+                    return PCAP_THREAD_ERRNO;
+                }
+                if (now.tv_sec > end.tv_sec
+                    || (now.tv_sec == end.tv_sec && (now.tv_usec * 1000) >= end.tv_nsec)) {
+                    break;
+                }
+
+                if (end.tv_sec > now.tv_sec) {
+                    diff.tv_sec  = end.tv_sec - now.tv_sec - 1;
+                    diff.tv_usec = 1000000 - now.tv_usec;
+                    diff.tv_usec += end.tv_nsec / 1000;
+                    if (diff.tv_usec > 1000000) {
+                        diff.tv_sec += diff.tv_usec / 1000000;
+                        diff.tv_usec %= 1000000;
+                    }
+                } else {
+                    diff.tv_sec = 0;
+                    if (end.tv_sec == now.tv_sec && (end.tv_nsec / 1000) > now.tv_usec) {
+                        diff.tv_usec = (end.tv_nsec / 1000) - now.tv_usec;
+                    } else {
+                        diff.tv_usec = 0;
+                    }
+                }
+            }
+
+            run = 0;
+            for (pcaplist = pcap_thread->pcaplist; pcaplist; pcaplist = pcaplist->next) {
+                int packets;
+
+                if (!pcaplist->running) {
+                    continue;
+                } else {
+                    run = 1;
+                }
+
+                pcap_thread->step = pcaplist;
 
                 packets = pcap_dispatch(pcaplist->pcap, -1, _callback2, (u_char*)pcaplist);
                 if (packets == PCAP_ERROR) {

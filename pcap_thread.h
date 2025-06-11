@@ -41,16 +41,10 @@
 #endif
 #include <pcap/pcap.h>
 #include <sys/socket.h>
-#ifdef TIME_WITH_SYS_TIME
-#include <sys/time.h>
-#include <time.h>
-#else
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
-#else
+#endif
 #include <time.h>
-#endif
-#endif
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <net/if_arp.h>
@@ -66,6 +60,7 @@
 #ifdef HAVE_MACHINE_ENDIAN_H
 #include <machine/endian.h>
 #endif
+#include <stdio.h>
 
 #ifndef __BYTE_ORDER
 #if defined(BYTE_ORDER)
@@ -517,7 +512,7 @@ struct pcap_thread {
 /* clang-format off */
 #define PCAP_THREAD_PCAPLIST_T_INIT { \
     0, 0, 0, \
-    0, 0, 0, 0, 0, 0, 0, 0, \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0, \
     PCAP_THREAD_PCAPLIST_T_INIT_THREAD \
     { 0, 0 }, \
@@ -533,6 +528,7 @@ struct pcap_thread_pcaplist {
 
     pcap_thread_pcaplist_t* next;
     char*                   name;
+    FILE*                   fp;
     pcap_t*                 pcap;
     void*                   user;
     int                     running;
@@ -636,9 +632,12 @@ int pcap_thread_set_callback_invalid(pcap_thread_t* pcap_thread, pcap_thread_lay
 
 int pcap_thread_open(pcap_thread_t* pcap_thread, const char* device, void* user);
 int pcap_thread_open_offline(pcap_thread_t* pcap_thread, const char* file, void* user);
+int pcap_thread_open_offline_fp(pcap_thread_t* pcap_thread, const char* file, FILE* fp, void* user);
 int pcap_thread_add(pcap_thread_t* pcap_thread, const char* name, pcap_t* pcap, void* user);
 int pcap_thread_activate(pcap_thread_t* pcap_thread);
 int pcap_thread_close(pcap_thread_t* pcap_thread);
+
+long pcap_thread_ftell(pcap_thread_t* pcap_thread);
 
 int pcap_thread_run(pcap_thread_t* pcap_thread);
 int pcap_thread_next(pcap_thread_t* pcap_thread);
