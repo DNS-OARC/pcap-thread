@@ -1,3 +1,25 @@
+2025-08-25 Jerry Lundström
+
+    Release pcap-thread 4.2.0
+
+    Added two new functions, `pcap_thread_open_offline_fp()` to open a PCAP
+    based on a `FILE*` and `pcap_thread_ftell()` to get the byte position in
+    the input.
+
+    Changed `pcap_thread_run()` to run a separate loop when all input are
+    offline PCAPs.
+
+    Improved error messages by adding an internal function,
+    `pcap_thread_handle_pcap_error()`, to handle all PCAP errors and use
+    `pcap_geterr()` or `pcap_statustostr()` to get details depending on the
+    error.
+
+    Update autotools requirement to v2.69 and updated AX macros.
+
+    a55a1bc Error handling, open offline
+    92b2165 sys/time.h
+    42e5bf2 autotools, fopen, ftell
+
 2025-04-23 Jerry Lundström
 
     Release pcap-thread 4.1.1
