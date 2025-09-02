@@ -32,7 +32,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 AC_PREREQ([2.69])
-AC_INIT([hexdump],[2.1.0],[admin@dns-oarc.net],[hexdump],[https://github.com/DNS-OARC/pcap-thread/issues])
+AC_INIT([hexdump],[2.1.0],[admin@dns-oarc.net],[hexdump],[https://codeberg.org/DNS-OARC/pcap-thread/issues])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_CONFIG_SRCDIR([hexdump.c])
 AC_CONFIG_HEADERS([config.h])
