@@ -46,7 +46,7 @@ int main(void) {
 
 ```shell
 git submodule init
-git submodule add https://github.com/DNS-OARC/pcap-thread.git src/pcap-thread
+git submodule add https://codeberg.org/DNS-OARC/pcap-thread.git src/pcap-thread
 git submodule update --init --recursive
 ```
 

@@ -94,7 +94,7 @@ cobadpkts: bad-packets/Makefile
 	cd bad-packets && test -d .git && git pull
 
 bad-packets/Makefile:
-	git clone https://github.com/DNS-OARC/bad-packets.git
+	git clone https://codeberg.org/DNS-OARC/bad-packets.git
 	cd bad-packets && git submodule update --init
 
 .pcap.pcap-dist:
