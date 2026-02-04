@@ -1,3 +1,5 @@
+# NOTE: Moved to https://codeberg.org/DNS-OARC/pcap-thread
+
 # pcap-thread
 
 PCAP helper library with POSIX threads support and transport layer callbacks
